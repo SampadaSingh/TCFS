@@ -1,0 +1,219 @@
+* {
+    box-sizing: border-box;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+    margin: 0;
+    background: linear-gradient(120deg, #e0f2ff, #f7fbff);
+    min-height: 100vh;
+}
+
+a {
+    text-decoration: none;
+    color: #0066cc;
+}
+
+.container {
+    width: 90%;
+    max-width: 1100px;
+    margin: auto;
+    padding: 20px;
+}
+.text-primary{
+    color: #57C785;
+}
+
+/* Navbar */
+.navbar {
+    background: white;
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.navbar h2 {
+    margin: 0;
+    color: #004080;
+}
+
+.navbar a {
+    margin-left: 15px;
+    font-weight: 500;
+}
+
+/* Card */
+.card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+/* Forms */
+form input, form select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+form button {
+    margin-top: 15px;
+    width: 100%;
+    padding: 10px;
+    background: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+form button:hover {
+    background: #004c99;
+}
+
+/* Landing page (index) */
+.landing-body {
+    background: #ffffff;
+    color: #0f0f0f;
+    font-family: 'Poppins', 'Segoe UI', Arial, sans-serif;
+    min-height: 100vh;
+}
+
+.landing-hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.landing-header {
+    height: 114px;
+    background: #fbf4f1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+}
+
+.brand {
+    font-size: 28px;
+    font-weight: 700;
+    color: #57C785;
+}
+
+.cta-pill {
+    width: 179px;
+    height: 56px;
+    background: #57C785;
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+}
+
+.landing-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 45px;
+    padding: 80px 16px 120px;
+}
+
+.btn-primary,
+.btn-outline {
+    width: 220px;
+    height: 76px;
+    border-radius: 40px;
+    font-size: 28px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-primary {
+    background: #57C785;
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 10px 20px rgba(234, 88, 12, 0.18);
+}
+
+.btn-outline {
+    background: #ffffff;
+    color: #000000;
+    border: 3px solid #57C785;
+}
+
+.btn-primary:hover,
+.btn-outline:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@media (max-width: 600px) {
+    .landing-header {
+        padding: 0 20px;
+        height: 96px;
+    }
+
+    .brand {
+        font-size: 22px;
+    }
+
+    .cta-pill {
+        width: 140px;
+        height: 48px;
+    }
+
+    .landing-content {
+        flex-direction: column;
+        gap: 24px;
+        padding: 60px 16px 80px;
+    }
+
+    .btn-primary,
+    .btn-outline {
+        width: 200px;
+        height: 64px;
+        font-size: 22px;
+    }
+}
+
+/* Auth pages */
+.auth-box {
+    max-width: 400px;
+    margin: 80px auto;
+}
+
+/* Dashboard match cards */
+.match-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.match-card {
+    border-left: 5px solid #0066cc;
+}
+
+.match-score {
+    font-size: 22px;
+    font-weight: bold;
+    color: #0066cc;
+}
