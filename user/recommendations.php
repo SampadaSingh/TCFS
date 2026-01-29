@@ -3,6 +3,7 @@ session_start();
 require "../config/db.php";
 require "../algorithms/tripRecommendation.php";
 require "../algorithms/placeRecommendation.php";
+require "../algorithms/companionRecommendation.php";
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
@@ -12,8 +13,8 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
-$recommendedTrips = recommendTripsForUser($conn, $user_id, 8);
-$recommendedCompanions = recommendCompanionsForUser($conn, $user_id, 6);
+$recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 8, 50);
+$recommendedCompanions = getCompanionRecommendations($conn, $user_id, 6, 30);
 $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
 
 
@@ -306,7 +307,6 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                 </div>
             <?php endif; ?>
         </div>
-            <!--need to remove trip details/ only profile -->
         <div class="section-card">
             <h2 class="section-title">
                 <i class="bi bi-people"></i> Compatible Companions
@@ -322,14 +322,6 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                             <div class="companion-info">
                                 <span class="match-badge"><?php echo round($companion['compatibility_score']); ?>% Match</span>
                                 <h3 class="card-title"><?php echo htmlspecialchars($companion['name']); ?></h3>
-                                <div class="meta-item">
-                                    <i class="bi bi-airplane"></i>
-                                    <span><?php echo htmlspecialchars($companion['trip_name']); ?></span>
-                                </div>
-                                <div class="meta-item">
-                                    <i class="bi bi-geo-alt"></i>
-                                    <span><?php echo htmlspecialchars($companion['destination']); ?></span>
-                                </div>
                                 <?php if (!empty($companion['common_interests'])): ?>
                                     <div class="interests-tags">
                                         <?php foreach (array_slice($companion['common_interests'], 0, 3) as $interest): ?>
@@ -338,8 +330,8 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                                     </div>
                                 <?php endif; ?>
                                 <div class="card-action">
-                                    <a href="viewTrip.php?id=<?php echo $companion['trip_id']; ?>" class="btn-view">
-                                        <i class="bi bi-eye"></i> View Trip
+                                    <a href="viewProfile.php?host_id=<?php echo $companion['id']; ?>" class="btn-view">
+                                        <i class="bi bi-person"></i> View Profile
                                     </a>
                                 </div>
                             </div>
@@ -366,11 +358,11 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                             <div class="place-icon">
                                 <i class="bi bi-pin-map-fill" style="color: #57C785;"></i>
                             </div>
-                            <h3 class="card-title"><?php echo htmlspecialchars($place['destination']); ?></h3>
-                            <div class="meta-item" style="justify-content: center;">
+                            <h3 class="card-title" style="justify-content: center; margin-left: 80px;"><?php echo htmlspecialchars($place['destination']); ?></h3>
+                            <!--<div class="meta-item" style="justify-content: center;">
                                 <i class="bi bi-map"></i>
                                 <span><?php echo htmlspecialchars($place['region']); ?></span>
-                            </div>
+                            </div>-->
                             <span class="reason-badge"><?php echo htmlspecialchars($place['reason']); ?></span>
                             <?php if (!empty($place['compatible_users'])): ?>
                                 <div class="meta-item" style="justify-content: center; margin-top: 10px;">

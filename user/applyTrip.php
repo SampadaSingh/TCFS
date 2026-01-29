@@ -235,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="content-card">
             <div class="trip-preview">
                 <h2 class="trip-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h2>
-                <p style="color: #999; margin: 10px 0;"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($trip['destination']); ?>, <?php echo htmlspecialchars($trip['region']); ?></p>
+                <p style="color: #999; margin: 10px 0;"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($trip['destination']); ?></p>
 
                 <div class="trip-meta">
                     <div class="meta-item">

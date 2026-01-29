@@ -1,7 +1,7 @@
 <?php
 require '../config/db.php';
 $error = '';
-$name = $email = $dob = $gender = $location = '';
+$name = $email = $password = $confirm = $dob = $gender = $location = '';
 $interests = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -179,6 +179,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             color: #57C785;
             font-size: 18px;
         }
+        .group label {
+            display: block;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 13px;
+            margin-bottom: 5px;
+            margin-left: 5px;
+            font-weight: 400;
+        }
     </style>
 </head>
 
@@ -207,6 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input name="location" placeholder="Location" value="<?= htmlspecialchars($location); ?>" required>
             </div>
             <div class="group">
+                <label for="dob">DOB:</label>
                 <input name="dob" type="date" value="<?= htmlspecialchars($dob); ?>" required>
             </div>
             <div class="group">

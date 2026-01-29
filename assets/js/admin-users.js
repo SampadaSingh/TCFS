@@ -1,5 +1,5 @@
 function viewUser(userId) {
-    fetch(`api/users.php?action=get&id=${userId}`)
+    fetch(`manageUsers.php?action=get&id=${userId}&ajax=1`)
         .then(response => response.json())
         .then(data => {
             if(data.success) {
@@ -52,7 +52,7 @@ function viewUser(userId) {
 }
 
 function editUser(userId) {
-    fetch(`api/users.php?action=get&id=${userId}`)
+    fetch(`manageUsers.php?action=get&id=${userId}&ajax=1`)
         .then(response => response.json())
         .then(data => {
             if(data.success) {
@@ -78,8 +78,9 @@ function deleteUser(userId, userName) {
         const formData = new FormData();
         formData.append('action', 'delete');
         formData.append('id', userId);
+        formData.append('ajax', '1');
 
-        fetch('api/users.php', {
+        fetch('manageUsers.php', {
             method: 'POST',
             body: formData
         })
@@ -107,8 +108,9 @@ document.getElementById('editUserForm').addEventListener('submit', function(e) {
 
     const formData = new FormData(this);
     formData.append('action', 'update');
+    formData.append('ajax', '1');
 
-    fetch('api/users.php', {
+    fetch('manageUsers.php', {
         method: 'POST',
         body: formData
     })

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require "../config/db.php";
+require "../algorithms/companionRecommendation.php";
 
 // Check if user is logged in
 if(!isset($_SESSION['user_id'])){
@@ -16,16 +17,28 @@ $user_query->bind_param("i", $user_id);
 $user_query->execute();
 $current_user = $user_query->get_result()->fetch_assoc();
 
-// Fetch suggested buddies (users excluding current user)
-$buddies_query = "SELECT u.*, 
-                  TIMESTAMPDIFF(YEAR, u.dob, CURDATE()) as age 
-                  FROM users u 
-                  WHERE u.id != ? AND u.role = 'User'
-                  LIMIT 12";
-$stmt = $conn->prepare($buddies_query);
-$stmt->bind_param("i", $user_id);
-$stmt->execute();
-$buddies_result = $stmt->get_result();
+// Get companion recommendations with lower threshold for more results
+$buddies = getCompanionRecommendations($conn, $user_id, 12, 25);
+
+// If no recommendations, get all users as fallback
+if (empty($buddies)) {
+    $buddies_query = "SELECT u.*, 
+                      TIMESTAMPDIFF(YEAR, u.dob, CURDATE()) as age 
+                      FROM users u 
+                      WHERE u.id != ? AND u.role = 'User'
+                      LIMIT 12";
+    $stmt = $conn->prepare($buddies_query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $buddies_result = $stmt->get_result();
+    
+    $buddies = [];
+    while ($row = $buddies_result->fetch_assoc()) {
+        $row['compatibility_score'] = 50; // Default score
+        $row['common_interests'] = [];
+        $buddies[] = $row;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -290,15 +303,10 @@ $buddies_result = $stmt->get_result();
         </div>
         
         <!-- Buddies Grid -->
-        <?php if($buddies_result->num_rows > 0): ?>
+        <?php if(!empty($buddies)): ?>
             <div class="buddies-grid">
-                <?php 
-                $match_scores = [94, 89, 85, 82, 78, 75, 72, 68, 65, 62, 58, 55];
-                $interests_list = ['Hiking, Photography', 'Adventure, Culture', 'Beach, Food', 'Culture, Art', 
-                                  'Wildlife, Nature', 'Food, Photography', 'Beach, Adventure', 'Hiking, Culture',
-                                  'Photography, Art', 'Food, Culture', 'Adventure, Hiking', 'Beach, Wildlife'];
-                $counter = 0;
-                while($buddy = $buddies_result->fetch_assoc()): 
+                <?php foreach($buddies as $buddy): 
+                    $age = !empty($buddy['dob']) ? date_diff(date_create($buddy['dob']), date_create('today'))->y : 'N/A';
                 ?>
                     <div class="buddy-card">
                         <div class="buddy-avatar">
@@ -306,19 +314,24 @@ $buddies_result = $stmt->get_result();
                         </div>
                         <div class="buddy-name"><?php echo htmlspecialchars($buddy['name']); ?></div>
                         <div class="buddy-info">
-                            <span><i class="bi bi-calendar"></i> <?php echo $buddy['age']; ?> years</span>
-                            <span><i class="bi bi-gender-ambiguous"></i> <?php echo htmlspecialchars($buddy['gender']); ?></span>
+                            <span><i class="bi bi-calendar"></i> <?php echo $age; ?> years</span>
+                            <span><i class="bi bi-gender-ambiguous"></i> <?php echo htmlspecialchars($buddy['gender'] ?? 'N/A'); ?></span>
                         </div>
-                        <div class="buddy-interests"><?php echo $interests_list[$counter % count($interests_list)]; ?></div>
-                        <div class="match-percentage"><?php echo $match_scores[$counter % count($match_scores)]; ?>% Match</div>
-                        <button class="connect-btn" onclick="connectBuddy(<?php echo $buddy['id']; ?>)">
-                            <i class="bi bi-person-plus"></i> Connect
-                        </button>
+                        <div class="buddy-interests">
+                            <?php 
+                            if (!empty($buddy['common_interests'])) {
+                                echo htmlspecialchars(implode(', ', array_slice($buddy['common_interests'], 0, 3)));
+                            } else {
+                                echo 'Explore their interests';
+                            }
+                            ?>
+                        </div>
+                        <div class="match-percentage"><?php echo round($buddy['compatibility_score']); ?>% Match</div>
+                        <a href="viewProfile.php?host_id=<?php echo $buddy['id']; ?>" class="connect-btn">
+                            <i class="bi bi-person"></i> View Profile
+                        </a>
                     </div>
-                <?php 
-                    $counter++;
-                endwhile; 
-                ?>
+                <?php endforeach; ?>
             </div>
         <?php else: ?>
             <div class="no-results">

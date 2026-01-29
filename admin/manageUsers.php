@@ -7,6 +7,82 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'Admin') {
     exit;
 }
 
+// Handle API requests
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
+    header('Content-Type: application/json');
+    
+    $action = $_POST['action'] ?? '';
+    
+    switch($action) {
+        case 'update':
+            $id = intval($_POST['user_id']);
+            $name = $conn->real_escape_string($_POST['name']);
+            $email = $conn->real_escape_string($_POST['email']);
+            $dob = $conn->real_escape_string($_POST['dob']);
+            $gender = $conn->real_escape_string($_POST['gender']);
+            $bio = $conn->real_escape_string($_POST['bio'] ?? '');
+
+            $check = $conn->query("SELECT id FROM users WHERE email = '$email' AND id != $id");
+            if($check->num_rows > 0) {
+                echo json_encode(['success' => false, 'message' => 'Email already exists']);
+                exit;
+            }
+
+            $sql = "UPDATE users SET name = '$name', email = '$email', dob = '$dob', gender = '$gender', bio = '$bio' WHERE id = $id";
+            
+            if($conn->query($sql)) {
+                echo json_encode(['success' => true, 'message' => 'User updated successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to update user: ' . $conn->error]);
+            }
+            exit;
+
+        case 'delete':
+            $id = intval($_POST['id']);
+            
+            if($conn->query("DELETE FROM users WHERE id = $id")) {
+                echo json_encode(['success' => true, 'message' => 'User deleted successfully']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Failed to delete user: ' . $conn->error]);
+            }
+            exit;
+
+        default:
+            echo json_encode(['success' => false, 'message' => 'Invalid action']);
+            exit;
+    }
+}
+
+// Handle GET API requests
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ajax'])) {
+    header('Content-Type: application/json');
+    
+    $action = $_GET['action'] ?? '';
+    
+    if ($action === 'get') {
+        $id = intval($_GET['id']);
+        $user = $conn->query("SELECT * FROM users WHERE id = $id")->fetch_assoc();
+
+        if($user) {
+            // Pull human-readable interests list for the admin modal
+            $interests = [];
+            $interest_sql = "SELECT i.interest_name FROM user_interests ui JOIN interests i ON ui.interest_id = i.id WHERE ui.user_id = $id";
+            $interest_result = $conn->query($interest_sql);
+            if($interest_result) {
+                while($row = $interest_result->fetch_assoc()) {
+                    $interests[] = $row['interest_name'];
+                }
+            }
+            $user['interests'] = !empty($interests) ? implode(', ', $interests) : '';
+
+            echo json_encode(['success' => true, 'user' => $user]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'User not found']);
+        }
+        exit;
+    }
+}
+
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $search_query = $search ? "WHERE name LIKE '%$search%' OR email LIKE '%$search%'" : "";
 

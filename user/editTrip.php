@@ -45,10 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_place = trim($_POST['end_place'] ?? '');
     $start_date = $_POST['start_date'] ?? '';
     $end_date = $_POST['end_date'] ?? '';
-    $travel_mode = $_POST['travel_mode'] ?? 'Mixed';
+    $travel_mode = isset($_POST['travel_mode']) ? $_POST['travel_mode'] : 'Mixed';
     $trip_style = $_POST['trip_style'] ?? 'Adventure';
     $description = trim($_POST['description'] ?? '');
-    $preferred_age = $_POST['preferred_age'] ?? 'Any';
+    $age_min = isset($_POST['age_min']) ? (int)$_POST['age_min'] : 0;
+    $age_max = isset($_POST['age_max']) ? (int)$_POST['age_max'] : 0;
     $preferred_gender = $_POST['preferred_gender'] ?? 'Any';
     $budget_label = $_POST['budget_range'] ?? '';
     $group_size_min = isset($_POST['group_size_min']) ? (int)$_POST['group_size_min'] : 5;
@@ -82,12 +83,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $budget_max = isset($budget_matches[0][1]) ? intval($budget_matches[0][1]) : $budget_min;
         }
 
-        $group_size_label = $group_size_min;
+        /*$group_size_label = $group_size_min;
         if ($group_size_max !== null) {
             $group_size_label .= '-' . $group_size_max;
         } else {
             $group_size_label .= '+';
-        }
+        }*/
 
         $update_stmt = $conn->prepare("
             UPDATE trips SET
@@ -102,11 +103,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 budget_label = ?,
                 budget_min = ?,
                 budget_max = ?,
-                group_size_label = ?,
                 group_size_min = ?,
                 group_size_max = ?,
                 preferred_gender = ?,
-                preferred_age = ?,
+                age_min = ?,
+                age_max = ?,
                 trip_style = ?,
                 description = ?,
                 collaborator_id = ?,
@@ -115,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
 
         $update_stmt->bind_param(
-            "ssssssissiisiiisssiii",
+            "ssssssissisiisiissiii",
             $trip_name,
             $destination,
             $start_place,
@@ -127,11 +128,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $budget_label,
             $budget_min,
             $budget_max,
-            $group_size_label,
             $group_size_min,
             $group_size_max,
             $preferred_gender,
-            $preferred_age,
+            $age_min,
+            $age_max,
             $trip_style,
             $description,
             $collaborator_id,
@@ -159,7 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $trip['travel_mode'] = $travel_mode;
         $trip['trip_style'] = $trip_style;
         $trip['description'] = $description;
-        $trip['preferred_age'] = $preferred_age;
+        $trip['age_min'] = $age_min;
+        $trip['age_max'] = $age_max;
         $trip['preferred_gender'] = $preferred_gender;
         $trip['budget_label'] = $budget_label;
         $trip['group_size_min'] = $group_size_min;
@@ -460,17 +462,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Preferred Age Group</label>
-                        <select name="preferred_age" class="form-select">
-                            <?php
-                            $ages = ["Any", "18-25", "25-35", "35-50", "50+"];
-                            foreach ($ages as $age):
-                            ?>
-                                <option value="<?= $age ?>" <?= $trip['preferred_age'] == $age ? 'selected' : '' ?>>
-                                    <?= $age ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label class="form-label">Minimum Age</label>
+                        <input
+                            type="number"
+                            name="age_min"
+                            class="form-control"
+                            min="18"
+                            max="80"
+                            required
+                            value="<?= htmlspecialchars($_POST['age_min'] ?? $trip['age_min'] ?? 0) ?>">
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Maximum Age</label>
+                        <input
+                            type="number"
+                            name="age_max"
+                            class="form-control"
+                            min="18"
+                            max="80"
+                            required
+                            value="<?= htmlspecialchars($_POST['age_max'] ?? $trip['age_max'] ?? 0) ?>">
                     </div>
 
                     <div class="col-md-6 mb-3">

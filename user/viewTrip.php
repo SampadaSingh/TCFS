@@ -159,6 +159,24 @@ $host = $host_stmt->get_result()->fetch_assoc();
                         <div class="info-value"><?php echo date('M d, Y', strtotime($trip['end_date'])); ?></div>
                     </div>
                     <div class="info-item">
+                        <div class="info-label">Preferred Age</div>
+                        <div class="info-value">
+                            <?php
+                            $age_min = $trip['age_min'];
+                            $age_max = $trip['age_max'];
+
+                            if ($age_min && $age_max) {
+                                echo ($age_min === $age_max)
+                                    ? htmlspecialchars($age_min)
+                                    : htmlspecialchars($age_min) . ' - ' . htmlspecialchars($age_max);
+                            } else {
+                                echo 'Any';
+                            }
+                            ?>
+                        </div>
+                    </div>
+
+                    <div class="info-item">
                         <div class="info-label">Duration</div>
                         <div class="info-value"><?php echo htmlspecialchars($trip['duration_days']); ?> days</div>
                     </div>
@@ -182,6 +200,33 @@ $host = $host_stmt->get_result()->fetch_assoc();
                         <div class="info-label">Ending Place</div>
                         <div class="info-value"><?php echo htmlspecialchars($trip['end_place']); ?></div>
                     </div>
+                    <div class="info-item">
+                        <div class="info-label">Group Size</div>
+                        <div class="info-value">
+                            <?php
+                            $group_size_min = $trip['group_size_min'];
+                            $group_size_max = $trip['group_size_max'];
+
+                            if ($group_size_min && $group_size_max) {
+                                echo ($group_size_min === $group_size_max)
+                                    ? htmlspecialchars($group_size_min)
+                                    : htmlspecialchars($group_size_min) . ' - ' . htmlspecialchars($group_size_max);
+                            } elseif ($group_size_min && !$group_size_max) {
+                                echo htmlspecialchars($group_size_min) . '+';
+                            } else {
+                                echo 'Any';
+                            }
+                            ?>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Preferred Gender</div>
+                        <div class="info-value"><?php echo htmlspecialchars($trip['preferred_gender']); ?></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Trip Status</div>
+                        <div class="info-value" style="text-transform: capitalize;"><?php echo htmlspecialchars($trip['status']); ?></div>
+                    </div>
 
                 </div>
             </div>
@@ -197,19 +242,19 @@ $host = $host_stmt->get_result()->fetch_assoc();
 
 
                     <?php if (!empty($trip['host_id'])):
-                        $host_stmt=$conn->prepare("SELECT id, name FROM users WHERE id = ?");
+                        $host_stmt = $conn->prepare("SELECT id, name FROM users WHERE id = ?");
                         $host_stmt->bind_param("i", $trip['host_id']);
                         $host_stmt->execute();
                         $host = $host_stmt->get_result()->fetch_assoc();
                         if ($host):
                     ?>
-                    <a href="viewProfile.php?host_id=<?php echo $host['id']; ?>" style="text-decoration: none;">
-                    <div class="host-card" style="width: 200px; text-align: center;">
-                        <i class="fas fa-user" style="font-size: 30px; color: #57C785; margin-bottom: 10px; display: block;"></i>
-                        <div class="host-name"><?php echo htmlspecialchars($host['name']); ?></div>
-                        <p style="color: #999; margin: 5px 0; font-size: 14px;">Trip Host</p>
-                    </div>
-                    </a>    
+                            <a href="viewProfile.php?host_id=<?php echo $host['id']; ?>" style="text-decoration: none;">
+                                <div class="host-card" style="width: 200px; text-align: center;">
+                                    <i class="fas fa-user" style="font-size: 30px; color: #57C785; margin-bottom: 10px; display: block;"></i>
+                                    <div class="host-name"><?php echo htmlspecialchars($host['name']); ?></div>
+                                    <p style="color: #999; margin: 5px 0; font-size: 14px;">Trip Host</p>
+                                </div>
+                            </a>
                     <?php endif;
                     endif; ?>
 

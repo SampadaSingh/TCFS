@@ -98,6 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt->execute();
             $message = "Preferences updated successfully!";
+            header("Location: userDashboard.php");
+            exit;
         } else {
             // INSERT
             $stmt = $conn->prepare("
@@ -471,21 +473,21 @@ $travel_modes = ['Bike', 'Car', 'Bus', 'Train', 'Flight', 'Jeep', 'Walking', 'Mi
                                 id="age_min"
                                 name="age_min"
                                 min="18"
-                                max="120"
+                                max="65"
                                 value="<?php echo isset($preferences['age_min']) ? (int)$preferences['age_min'] : 18; ?>">
                             <div class="help-text">Minimum age of travel companions</div>
                         </div>
 
                         <div>
                             <label for="age_max" class="form-label">Companion Maximum Age</label>
-                            <input
+                            <input  
                                 type="number"
                                 class="form-control"
                                 id="age_max"
                                 name="age_max"
                                 min="18"
-                                max="120"
-                                value="<?php echo isset($preferences['age_max']) ? (int)$preferences['age_max'] : 80; ?>">
+                                max="65"
+                                value="<?php echo isset($preferences['age_max']) ? (int)$preferences['age_max'] : 65; ?>">
                             <div class="help-text">Maximum age of travel companions</div>
                         </div>
                     </div>

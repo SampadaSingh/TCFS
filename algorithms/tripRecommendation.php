@@ -229,8 +229,7 @@ function getEligibleTripsForRecommendation($conn, $userId, $userDestination = ''
         $query .= " AND (t.destination LIKE ?)";
         $search = "%$userDestination%";
         $params[] = $search;
-        $params[] = $search;
-        $types .= "ss";
+        $types .= "s";
     }
 
     $query .= " ORDER BY t.start_date ASC";
@@ -238,7 +237,6 @@ function getEligibleTripsForRecommendation($conn, $userId, $userDestination = ''
     $stmt = $conn->prepare($query);
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
-    $result = $stmt->execute();
 
     $trips = [];
     $result = $stmt->get_result();
@@ -506,65 +504,6 @@ function recommendTripsForUser($conn, $currentUserId, $limit = 10, $minScore = 6
 }
 
 
-function recommendCompanionsForUser($conn, $currentUserId, $limit = 10, $minScore = 50) {
-
-    $currentUserTrip = getUserActiveTrip($conn, $currentUserId);
-
-    if (!$currentUserTrip) return [];
-
-    $currentUserInterests = getUserInterests($conn, $currentUserId);
-
-    $query = "
-        SELECT DISTINCT u.id, u.name, u.email, u.bio,
-               t.id as trip_id, t.trip_name, t.destination, 
-               t.start_date, t.end_date, t.travel_mode
-        FROM users u
-        JOIN trips t ON u.id = t.host_id
-        WHERE u.id != ?
-          AND t.status IN ('pending', 'confirmed')
-          AND t.start_date >= CURDATE()
-    ";
-
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("i", $currentUserId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    $companions = [];
-
-    while ($row = $result->fetch_assoc()) {
-
-        $companionTrip = [
-            'id' => $row['trip_id'],
-            'destination' => $row['destination'],
-            'start_date' => $row['start_date'],
-            'end_date' => $row['end_date'],
-            'travel_mode' => $row['travel_mode']
-        ];
-
-        $companionInterests = getUserInterests($conn, $row['id']);
-
-        $score = weightedMatchScore(
-            $currentUserTrip,
-            $companionTrip,
-            $currentUserInterests,
-            $companionInterests
-        );
-
-        // Filter weak users
-        if ($score >= $minScore) {
-            $row['compatibility_score'] = round($score, 1);
-            $row['common_interests'] = array_values(
-                array_intersect($currentUserInterests, $companionInterests)
-            );
-            $companions[] = $row;
-        }
-    }
-
-    usort($companions, fn($a, $b) => $b['compatibility_score'] <=> $a['compatibility_score']);
-
-    return array_slice($companions, 0, $limit);
-}
 
 
 ?>

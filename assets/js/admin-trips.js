@@ -1,5 +1,5 @@
 function viewTrip(tripId) {
-    fetch(`api/trips.php?action=get&id=${tripId}`)
+    fetch(`manageTrips.php?action=get&id=${tripId}&ajax=1`)
         .then(response => response.json())
         .then(data => {
             if(data.success) {
@@ -60,7 +60,7 @@ function viewTrip(tripId) {
 }
 
 function editTrip(tripId) {
-    fetch(`api/trips.php?action=get&id=${tripId}`)
+    fetch(`manageTrips.php?action=get&id=${tripId}&ajax=1`)
         .then(response => response.json())
         .then(data => {
             if(data.success) {
@@ -89,8 +89,9 @@ function deleteTrip(tripId, tripName) {
         const formData = new FormData();
         formData.append('action', 'delete');
         formData.append('id', tripId);
+        formData.append('ajax', '1');
 
-        fetch('api/trips.php', {
+        fetch('manageTrips.php', {
             method: 'POST',
             body: formData
         })
@@ -118,8 +119,9 @@ document.getElementById('editTripForm').addEventListener('submit', function(e) {
 
     const formData = new FormData(this);
     formData.append('action', 'update');
+    formData.append('ajax', '1');
 
-    fetch('api/trips.php', {
+    fetch('manageTrips.php', {
         method: 'POST',
         body: formData
     })

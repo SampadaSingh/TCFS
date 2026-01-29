@@ -7,8 +7,9 @@ document.getElementById('adminProfileForm').addEventListener('submit', function(
 
     const formData = new FormData(this);
     formData.append('action', 'update_profile');
+    formData.append('ajax', '1');
 
-    fetch('api/settings.php', {
+    fetch('adminSettings.php', {
         method: 'POST',
         body: formData
     })
@@ -34,8 +35,9 @@ document.getElementById('changePasswordForm').addEventListener('submit', functio
 
     const formData = new FormData(this);
     formData.append('action', 'change_password');
+    formData.append('ajax', '1');
 
-    fetch('api/settings.php', {
+    fetch('adminSettings.php', {
         method: 'POST',
         body: formData
     })
@@ -55,7 +57,6 @@ document.getElementById('changePasswordForm').addEventListener('submit', functio
 });
 
 function validateProfileForm() {
-    let isValid = true;
     clearErrors();
 
     const name = document.getElementById('admin_name').value.trim();
@@ -63,16 +64,15 @@ function validateProfileForm() {
 
     if(name.length < 2) {
         showError('error_admin_name', 'Name must be at least 2 characters');
-        isValid = false;
+        return false;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if(!emailRegex.test(email)) {
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         showError('error_admin_email', 'Please enter a valid email address');
-        isValid = false;
+        return false;
     }
 
-    return isValid;
+    return true;
 }
 
 function validatePasswordForm() {
@@ -83,33 +83,27 @@ function validatePasswordForm() {
     const newPassword = document.getElementById('new_password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
 
-    if(currentPassword.length < 1) {
+    if(!currentPassword) {
         showError('error_current_password', 'Please enter your current password');
-        isValid = false;
+        return false;
     }
 
     if(newPassword.length < 8) {
         showError('error_new_password', 'Password must be at least 8 characters');
-        isValid = false;
-    }
-
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
-    if(!passwordRegex.test(newPassword)) {
-        showError('error_new_password', 'Password must contain uppercase, lowercase, and number');
-        isValid = false;
+        return false;
     }
 
     if(newPassword !== confirmPassword) {
         showError('error_confirm_password', 'Passwords do not match');
-        isValid = false;
+        return false;
     }
 
     if(currentPassword === newPassword) {
         showError('error_new_password', 'New password must be different from current password');
-        isValid = false;
+        return false;
     }
 
-    return isValid;
+    return true;
 }
 
 function cleanupOldData() {

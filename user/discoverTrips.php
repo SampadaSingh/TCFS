@@ -12,7 +12,6 @@ $user_id = $_SESSION['user_id'];
 $filter_destination = $_GET['destination'] ?? '';
 $filter_budget = $_GET['budget'] ?? '';
 
-// Optimized query with accepted_count subquery
 $query = "SELECT t.*, 
                 (SELECT COUNT(*) FROM trip_applications WHERE trip_id = t.id AND status = 'accepted') as accepted_count
           FROM trips t 
@@ -21,17 +20,26 @@ $params = [$user_id];
 $types = "i";
 
 if ($filter_destination) {
-    $query .= " AND (t.destination LIKE ? OR t.region LIKE ?)";
+    $query .= " AND t.destination LIKE ?";
     $search = "%$filter_destination%";
-    $params = array_merge($params, [$search, $search]);
-    $types .= "ss";
+    $params = array_merge($params, [$search]);
+    $types .= "s";
 }
 
 if ($filter_budget) {
-    list($min, $max) = explode('-', $filter_budget);
-    $query .= " AND t.budget_min >= ? AND t.budget_max <= ?";
-    $params = array_merge($params, [$min, $max]);
-    $types .= "ii";
+    if (strpos($filter_budget, '+') !== false) {
+        $min = (int)str_replace([',', '+'], '', $filter_budget);
+        $query .= " AND t.budget_min >= ?";
+        $params = array_merge($params, [$min]);
+        $types .= "i";
+    } else {
+        list($min, $max) = explode('-', $filter_budget);
+        $min = (int)str_replace(',', '', $min);
+        $max = (int)str_replace(',', '', $max);
+        $query .= " AND ((t.budget_min >= ? AND t.budget_min <= ?) OR (t.budget_max >= ? AND t.budget_max <= ?) OR (t.budget_min <= ? AND t.budget_max >= ?))";
+        $params = array_merge($params, [$min, $max, $min, $max, $min, $max]);
+        $types .= "iiiiii";
+    }
 }
 
 $query .= " ORDER BY t.start_date ASC";
@@ -69,6 +77,15 @@ $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
 $user_stmt->bind_param("i", $user_id);
 $user_stmt->execute();
 $user = $user_stmt->get_result()->fetch_assoc();
+
+foreach ($trips_array as &$trip) {
+    $trip['compatibility_score'] = calculateTripCompatibility($user, $trip);
+}
+unset($trip); 
+
+usort($trips_array, function($a, $b) {
+    return $b['compatibility_score'] <=> $a['compatibility_score'];
+});
 ?>
 
 <!DOCTYPE html>
@@ -321,9 +338,14 @@ $user = $user_stmt->get_result()->fetch_assoc();
                 <div class="col-md-4">
                     <select name="budget" class="filter-input w-100">
                         <option value="">All Budgets</option>
-                        <option value="10000-15000" <?php echo $filter_budget === '10000-15000' ? 'selected' : ''; ?>>Rs.10k - Rs.15k</option>
-                        <option value="15000-25000" <?php echo $filter_budget === '15000-25000' ? 'selected' : ''; ?>>Rs.15k - Rs.25k</option>
-                        <option value="25000-40000" <?php echo $filter_budget === '25000-40000' ? 'selected' : ''; ?>>Rs.25k - Rs.40k</option>
+                        <option value="1000-5000" <?php echo $filter_budget === '1000-5000' ? 'selected' : ''; ?>>NRS 1,000–5,000</option>
+                        <option value="5000-10000" <?php echo $filter_budget === '5000-10000' ? 'selected' : ''; ?>>NRS 5,000–10,000</option>
+                        <option value="10000-15000" <?php echo $filter_budget === '10000-15000' ? 'selected' : ''; ?>>NRS 10,000–15,000</option>
+                        <option value="15000-25000" <?php echo $filter_budget === '15000-25000' ? 'selected' : ''; ?>>NRS 15,000–25,000</option>
+                        <option value="25000-40000" <?php echo $filter_budget === '25000-40000' ? 'selected' : ''; ?>>NRS 25,000–40,000</option>
+                        <option value="40000-60000" <?php echo $filter_budget === '40000-60000' ? 'selected' : ''; ?>>NRS 40,000–60,000</option>
+                        <option value="60000-100000" <?php echo $filter_budget === '60000-100000' ? 'selected' : ''; ?>>NRS 60,000–100,000</option>
+                        <option value="100000+" <?php echo $filter_budget === '100000+' ? 'selected' : ''; ?>>NRS 100,000+</option>
                     </select>
                 </div>
                 <div class="col-md-4">
@@ -345,7 +367,7 @@ $user = $user_stmt->get_result()->fetch_assoc();
                     $hasApplied = isset($user_applications[$trip_id]);
                     $isFull = ($trip['accepted_count'] ?? 0) >= ($trip['group_size_min'] ?? 0);
                     $isPast = strtotime($trip['start_date']) < strtotime('today');
-                    $score = calculateTripCompatibility($user, $trip);
+                    $score = $trip['compatibility_score']; // Use pre-calculated score
                 ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="trip-card">
@@ -377,6 +399,7 @@ $user = $user_stmt->get_result()->fetch_assoc();
                                 </div>
                                 <p class="trip-description"><?php echo substr(htmlspecialchars($trip['description'] ?? ''), 0, 100) . '...'; ?></p>
                                 
+                                <?php if ($trip['host_id'] == $user_id): ?>
                                 <div class="applicants-section">
                                     <p class="applicants-label">Applied by:</p>
                                     <?php
@@ -402,6 +425,7 @@ $user = $user_stmt->get_result()->fetch_assoc();
                                     }
                                     ?>
                                 </div>
+                                <?php endif; ?>
 
                                 <div class="trip-footer">
                                     <span class="group-progress">
