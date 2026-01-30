@@ -55,7 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $group_size_min = isset($_POST['group_size_min']) ? (int)$_POST['group_size_min'] : 5;
     $group_size_max = isset($_POST['group_size_max']) ? (int)$_POST['group_size_max'] : null;
     $collaborator_id = !empty($_POST['collaborator_id']) ? intval($_POST['collaborator_id']) : NULL;
-
+    $previous_collaborator = $trip['collaborator_id'];
+    $collab_var = $collaborator_id ?? null;
+    
     $startdate = strtotime($start_date);
     $enddate = strtotime($end_date);
 
@@ -135,13 +137,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $age_max,
             $trip_style,
             $description,
-            $collaborator_id,
+            $collab_var,
             $trip_id,
             $user_id
         );
 
         if ($update_stmt->execute()) {
             $update_stmt->close();
+            
+            if ($collaborator_id && $collaborator_id != $previous_collaborator) {
+                $check_req = $conn->prepare("SELECT id, status FROM collaborator_requests WHERE trip_id = ? AND collaborator_id = ?");
+                $check_req->bind_param("ii", $trip_id, $collaborator_id);
+                $check_req->execute();
+                $existing = $check_req->get_result()->fetch_assoc();
+                $check_req->close();
+                
+                if (!$existing) {
+                    $req_stmt = $conn->prepare("INSERT INTO collaborator_requests (trip_id, host_id, collaborator_id, status) VALUES (?, ?, ?, 'pending')");
+                    $req_stmt->bind_param("iii", $trip_id, $user_id, $collaborator_id);
+                    $req_stmt->execute();
+                    $req_stmt->close();
+                    $success = "Collaborator request sent successfully!";
+                } elseif ($existing['status'] == 'rejected') {
+                    $update_req = $conn->prepare("UPDATE collaborator_requests SET status = 'pending', created_at = NOW() WHERE trip_id = ? AND collaborator_id = ?");
+                    $update_req->bind_param("ii", $trip_id, $collaborator_id);
+                    $update_req->execute();
+                    $update_req->close();
+                    $success = "Collaborator request resent successfully!";
+                }
+            }
+            
             header("Location: viewTrip.php?id=$trip_id&success=1");
             exit;
         } else {

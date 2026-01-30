@@ -81,9 +81,9 @@ $user = $user_stmt->get_result()->fetch_assoc();
 foreach ($trips_array as &$trip) {
     $trip['compatibility_score'] = calculateTripCompatibility($user, $trip);
 }
-unset($trip); 
+unset($trip);
 
-usort($trips_array, function($a, $b) {
+usort($trips_array, function ($a, $b) {
     return $b['compatibility_score'] <=> $a['compatibility_score'];
 });
 ?>
@@ -291,8 +291,8 @@ usort($trips_array, function($a, $b) {
         }
 
         .btn-apply:disabled {
-            background: #ccc !important;  
-            color: #666 !important;       
+            background: #ccc !important;
+            color: #666 !important;
             border: 2px solid #ccc !important;
             cursor: not-allowed;
             opacity: 0.7;
@@ -315,7 +315,7 @@ usort($trips_array, function($a, $b) {
             .trip-details {
                 grid-template-columns: 1fr;
             }
-            
+
             .main-content {
                 margin-left: 0;
                 padding: 20px;
@@ -397,34 +397,36 @@ usort($trips_array, function($a, $b) {
                                         <span><?php echo htmlspecialchars($trip['travel_mode'] ?? 'Not specified'); ?></span>
                                     </div>
                                 </div>
-                                <p class="trip-description"><?php echo substr(htmlspecialchars($trip['description'] ?? ''), 0, 100) . '...'; ?></p>
-                                
+                                <!--<p class="trip-description">
+                                    <?php /*echo substr(htmlspecialchars($trip['description'] ?? ''), 0, 100) . '...'; */ ?>
+                                </p>-->
+
                                 <?php if ($trip['host_id'] == $user_id): ?>
-                                <div class="applicants-section">
-                                    <p class="applicants-label">Applied by:</p>
-                                    <?php
-                                    $applicants_query = "SELECT u.id, u.name FROM trip_applications ta 
+                                    <div class="applicants-section">
+                                        <p class="applicants-label">Applied by:</p>
+                                        <?php
+                                        $applicants_query = "SELECT u.id, u.name FROM trip_applications ta 
                                                         JOIN users u ON ta.user_id = u.id 
                                                         WHERE ta.trip_id = ? AND ta.status = 'accepted' LIMIT 5";
-                                    $applicants_stmt = $conn->prepare($applicants_query);
-                                    $applicants_stmt->bind_param("i", $trip_id);
-                                    $applicants_stmt->execute();
-                                    $applicants_result = $applicants_stmt->get_result();
-                                    
-                                    if ($applicants_result->num_rows > 0) {
-                                        echo '<div class="applicants-list">';
-                                        while ($applicant = $applicants_result->fetch_assoc()) {
-                                            echo '<span class="applicant-badge">' . htmlspecialchars($applicant['name']) . '</span>';
+                                        $applicants_stmt = $conn->prepare($applicants_query);
+                                        $applicants_stmt->bind_param("i", $trip_id);
+                                        $applicants_stmt->execute();
+                                        $applicants_result = $applicants_stmt->get_result();
+
+                                        if ($applicants_result->num_rows > 0) {
+                                            echo '<div class="applicants-list">';
+                                            while ($applicant = $applicants_result->fetch_assoc()) {
+                                                echo '<span class="applicant-badge">' . htmlspecialchars($applicant['name']) . '</span>';
+                                            }
+                                            if ($applicants_result->num_rows >= 5 && ($trip['accepted_count'] ?? 0) > 5) {
+                                                echo '<span class="applicant-more">+' . (($trip['accepted_count'] ?? 0) - 5) . ' more</span>';
+                                            }
+                                            echo '</div>';
+                                        } else {
+                                            echo '<p style="font-size: 12px; color: #999; margin: 0;">No applicants yet</p>';
                                         }
-                                        if ($applicants_result->num_rows >= 5 && ($trip['accepted_count'] ?? 0) > 5) {
-                                            echo '<span class="applicant-more">+' . (($trip['accepted_count'] ?? 0) - 5) . ' more</span>';
-                                        }
-                                        echo '</div>';
-                                    } else {
-                                        echo '<p style="font-size: 12px; color: #999; margin: 0;">No applicants yet</p>';
-                                    }
-                                    ?>
-                                </div>
+                                        ?>
+                                    </div>
                                 <?php endif; ?>
 
                                 <div class="trip-footer">

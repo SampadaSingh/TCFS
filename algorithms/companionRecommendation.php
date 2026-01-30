@@ -5,7 +5,6 @@ require_once 'compatibility.php';
 function calculateCompanionScore($userTrip, $companionTrip, $userInterests, $companionInterests) {
     $score = 0;
     
-    // 1. Destination compatibility (0-25 points) - More lenient
     $userDest = strtolower(trim($userTrip['destination'] ?? ''));
     $companionDest = strtolower(trim($companionTrip['destination'] ?? ''));
     
@@ -13,15 +12,14 @@ function calculateCompanionScore($userTrip, $companionTrip, $userInterests, $com
         if ($userDest === $companionDest) {
             $score += 25;
         } elseif (strpos($userDest, $companionDest) !== false || strpos($companionDest, $userDest) !== false) {
-            $score += 15; // Partial match
+            $score += 15; 
         } else {
-            $score += 5; // Different but still give some points
+            $score += 5; 
         }
     } else {
-        $score += 10; // No preference = neutral
+        $score += 10; 
     }
     
-    // 2. Date overlap compatibility (0-25 points) - More flexible
     $dateScore = calculateDateOverlapScore(
         $userTrip['start_date'] ?? null,
         $userTrip['end_date'] ?? null,
@@ -30,11 +28,9 @@ function calculateCompanionScore($userTrip, $companionTrip, $userInterests, $com
     );
     $score += $dateScore;
     
-    // 3. Shared interests (0-30 points) - Increased weight
     $interestScore = calculateSharedInterestsScore($userInterests, $companionInterests);
     $score += $interestScore;
     
-    // 4. Travel mode compatibility (0-20 points) - More generous
     $modeScore = calculateTravelModeScore(
         $userTrip['travel_mode'] ?? '',
         $companionTrip['travel_mode'] ?? ''
@@ -44,12 +40,9 @@ function calculateCompanionScore($userTrip, $companionTrip, $userInterests, $com
     return min(round($score, 1), 100);
 }
 
-/**
- * Calculate date overlap score with more lenient matching
- */
 function calculateDateOverlapScore($userStart, $userEnd, $companionStart, $companionEnd) {
     if (empty($userStart) || empty($userEnd) || empty($companionStart) || empty($companionEnd)) {
-        return 15; // Give neutral score if dates not available
+        return 15; 
     }
     
     try {
@@ -58,29 +51,26 @@ function calculateDateOverlapScore($userStart, $userEnd, $companionStart, $compa
         $companionStartDate = new DateTime($companionStart);
         $companionEndDate = new DateTime($companionEnd);
         
-        // Calculate overlap
         $overlapStart = max($userStartDate, $companionStartDate);
         $overlapEnd = min($userEndDate, $companionEndDate);
         
         if ($overlapStart > $overlapEnd) {
-            // No overlap - check if dates are within 30 days of each other
             $daysDiff = min(
                 abs($userStartDate->diff($companionStartDate)->days),
                 abs($userEndDate->diff($companionEndDate)->days)
             );
             
             if ($daysDiff <= 7) {
-                return 20; // Very close dates
+                return 20;
             } elseif ($daysDiff <= 14) {
                 return 15;
             } elseif ($daysDiff <= 30) {
                 return 10;
             } else {
-                return 5; // Still give some points
+                return 5; 
             }
         }
         
-        // Calculate percentage of overlap
         $overlapDays = $overlapStart->diff($overlapEnd)->days + 1;
         $userDuration = $userStartDate->diff($userEndDate)->days + 1;
         $companionDuration = $companionStartDate->diff($companionEndDate)->days + 1;
@@ -88,7 +78,6 @@ function calculateDateOverlapScore($userStart, $userEnd, $companionStart, $compa
         
         $overlapPercent = ($overlapDays / $maxDuration) * 100;
         
-        // More generous scoring
         if ($overlapPercent >= 50) {
             return 25;
         } elseif ($overlapPercent >= 25) {
@@ -99,20 +88,18 @@ function calculateDateOverlapScore($userStart, $userEnd, $companionStart, $compa
             return 10;
         }
     } catch (Exception $e) {
-        return 15; // Neutral score on error
+        return 15; 
     }
 }
 
-/**
- * Calculate shared interests score with more lenient matching
- */
+
 function calculateSharedInterestsScore($userInterests, $companionInterests) {
     if (empty($userInterests) && empty($companionInterests)) {
-        return 15; // Both have no interests - neutral match
+        return 15; 
     }
     
     if (empty($userInterests) || empty($companionInterests)) {
-        return 10; // One has no interests - give some points
+        return 10; 
     }
     
     $commonInterests = array_intersect($userInterests, $companionInterests);
@@ -123,7 +110,6 @@ function calculateSharedInterestsScore($userInterests, $companionInterests) {
         return 15;
     }
     
-    // More generous interest matching
     $matchPercent = ($commonCount / $totalUnique) * 100;
     
     if ($commonCount >= 5) {
@@ -135,26 +121,23 @@ function calculateSharedInterestsScore($userInterests, $companionInterests) {
     } elseif ($commonCount >= 1) {
         return 15;
     } else {
-        return 8; // No common interests but still give points
+        return 8; 
     }
 }
 
-/**
- * Calculate travel mode compatibility score
- */
+
 function calculateTravelModeScore($userMode, $companionMode) {
     $userMode = strtolower(trim($userMode));
     $companionMode = strtolower(trim($companionMode));
     
     if (empty($userMode) || empty($companionMode)) {
-        return 12; // Neutral if no preference
+        return 12; 
     }
     
     if ($userMode === $companionMode) {
         return 20;
     }
     
-    // Check for compatible modes
     $compatibleModes = [
         'mixed' => ['bike', 'car', 'bus', 'train', 'flight', 'jeep', 'walking'],
         'bike' => ['walking', 'mixed'],
@@ -170,12 +153,9 @@ function calculateTravelModeScore($userMode, $companionMode) {
         return 15;
     }
     
-    return 8; // Different modes but still compatible
+    return 8; 
 }
 
-/**
- * Build a trip array from user preferences
- */
 function buildTripFromPreferences($preferences, $fallbackTrip = null) {
     $start = !empty($preferences['available_from']) ? $preferences['available_from'] : null;
     $end = !empty($preferences['available_to']) ? $preferences['available_to'] : null;
@@ -193,9 +173,6 @@ function buildTripFromPreferences($preferences, $fallbackTrip = null) {
     ];
 }
 
-/**
- * Get user preferences from database
- */
 function getCompanionUserPreferences($conn, $userId) {
     $query = "
         SELECT up.*, u.available_from, u.available_to, u.travel_mode
@@ -212,7 +189,6 @@ function getCompanionUserPreferences($conn, $userId) {
     $preferences = $result->fetch_assoc();
     
     if (!$preferences) {
-        // Return default preferences
         $preferences = [
             'user_id' => $userId,
             'preferred_destination' => '',
@@ -225,9 +201,6 @@ function getCompanionUserPreferences($conn, $userId) {
     return $preferences;
 }
 
-/**
- * Get user's active trip
- */
 function getCompanionUserActiveTrip($conn, $userId) {
     $stmt = $conn->prepare("
         SELECT t.* 
@@ -244,9 +217,6 @@ function getCompanionUserActiveTrip($conn, $userId) {
     return $result->fetch_assoc();
 }
 
-/**
- * Get user interests
- */
 function getCompanionUserInterests($conn, $userId) {
     $query = "
         SELECT i.interest_name
@@ -268,21 +238,12 @@ function getCompanionUserInterests($conn, $userId) {
     return $interests;
 }
 
-/**
- * Main function to get companion recommendations
- * @param mysqli $conn Database connection
- * @param int $userId Current user ID
- * @param int $limit Maximum number of recommendations
- * @param float $minScore Minimum compatibility score (default: 30 for more results)
- * @return array Array of recommended companions with scores
- */
+
 function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30) {
-    // Get current user's trip or preferences
     $userTrip = getCompanionUserActiveTrip($conn, $userId);
     $preferences = getCompanionUserPreferences($conn, $userId);
     $userInterests = getCompanionUserInterests($conn, $userId);
     
-    // Build reference trip from active trip or preferences
     $referenceTrip = null;
     if ($userTrip) {
         $referenceTrip = [
@@ -295,7 +256,6 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
         $referenceTrip = buildTripFromPreferences($preferences);
     }
     
-    // Get potential companions (users with trips)
     $query = "
         SELECT DISTINCT 
             u.id, 
@@ -325,10 +285,9 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
     $result = $stmt->get_result();
     
     $companions = [];
-    $processedUsers = []; // Track users to avoid duplicates
+    $processedUsers = []; 
     
     while ($row = $result->fetch_assoc()) {
-        // Skip if we already processed this user
         if (isset($processedUsers[$row['id']])) {
             continue;
         }
@@ -342,7 +301,6 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
         
         $companionInterests = getCompanionUserInterests($conn, $row['id']);
         
-        // Calculate compatibility score with lenient algorithm
         $score = calculateCompanionScore(
             $referenceTrip,
             $companionTrip,
@@ -350,7 +308,6 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
             $companionInterests
         );
         
-        // Only include companions meeting minimum score
         if ($score >= $minScore) {
             $processedUsers[$row['id']] = true;
             
@@ -374,23 +331,16 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
         }
     }
     
-    // Sort by compatibility score (highest first)
     usort($companions, function($a, $b) {
         return $b['compatibility_score'] <=> $a['compatibility_score'];
     });
     
-    // Return top N companions
     return array_slice($companions, 0, $limit);
 }
 
-/**
- * Get companion recommendations with detailed breakdown
- * For debugging and analysis purposes
- */
 function getCompanionRecommendationsWithBreakdown($conn, $userId, $limit = 10, $minScore = 30) {
     $recommendations = getCompanionRecommendations($conn, $userId, $limit, $minScore);
     
-    // Add breakdown details
     foreach ($recommendations as &$companion) {
         $companion['score_breakdown'] = [
             'destination' => 'Calculated based on location match',

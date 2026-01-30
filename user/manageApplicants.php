@@ -10,45 +10,104 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['trip_id'])) {
 $user_id = $_SESSION['user_id'];
 $trip_id = (int)$_GET['trip_id'];
 
-$trip_stmt = $conn->prepare("SELECT * FROM trips WHERE id = ? AND host_id = ?");
-$trip_stmt->bind_param("ii", $trip_id, $user_id);
-$trip_stmt->execute();
-$trip = $trip_stmt->get_result()->fetch_assoc();
+$is_host = false;
+$is_collaborator = false;
 
-if (!$trip) {
-    header('Location: myTrips.php');
+$role_stmt = $conn->prepare("
+    SELECT 
+        t.*,
+        CASE 
+            WHEN t.host_id = ? THEN 'host'
+            WHEN cr.status = 'accepted' THEN 'collaborator'
+        END AS role
+    FROM trips t
+    LEFT JOIN collaborator_requests cr 
+        ON t.id = cr.trip_id 
+       AND cr.collaborator_id = ?
+       AND cr.status = 'accepted'
+    WHERE t.id = ?
+");
+$role_stmt->bind_param("iii", $user_id, $user_id, $trip_id);
+$role_stmt->execute();
+$trip = $role_stmt->get_result()->fetch_assoc();
+$role_stmt->close();
+
+if (!$trip || !$trip['role']) {
+    header("Location: viewTrip.php?trip_id=$trip_id");
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+$is_host = ($trip['role'] === 'host');
+$is_collaborator = ($trip['role'] === 'collaborator');
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    if (!$is_host) {
+        header("Location: manageApplicants.php?trip_id=$trip_id");
+        exit;
+    }
+
     $app_id = (int)$_POST['app_id'];
     $action = $_POST['action'];
 
-    if ($action === 'accept') {
-        $stmt = $conn->prepare("UPDATE trip_applications SET status = 'accepted' WHERE id = ?");
-        $stmt->bind_param("i", $app_id);
-        $stmt->execute();
+    $stmt = $conn->prepare("SELECT status FROM trip_applications WHERE id = ? AND trip_id = ?");
+    $stmt->bind_param("ii", $app_id, $trip_id);
+    $stmt->execute();
+    $application = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
 
-        $update_stmt = $conn->prepare("UPDATE trips SET accepted_count = accepted_count + 1 WHERE id = ?");
-        $update_stmt->bind_param("i", $trip_id);
-        $update_stmt->execute();
+    if ($application) {
+        if ($action === 'accept' && $application['status'] !== 'accepted') {
+            $u = $conn->prepare("UPDATE trip_applications SET status='accepted' WHERE id=?");
+            $u->bind_param("i", $app_id);
+            $u->execute();
+        }
 
-        if ($trip['accepted_count'] + 1 >= $trip['group_size_min']) {
-            $confirm_stmt = $conn->prepare("UPDATE trips SET status = 'confirmed' WHERE id = ?");
+        if ($action === 'reject' && $application['status'] !== 'rejected') {
+            $u = $conn->prepare("UPDATE trip_applications SET status='rejected' WHERE id=?");
+            $u->bind_param("i", $app_id);
+            $u->execute();
+        }
+
+        $count_stmt = $conn->prepare("
+            SELECT COUNT(DISTINCT user_id) AS accepted_count, t.group_size_min
+            FROM trip_applications a
+            JOIN trips t ON a.trip_id = t.id
+            WHERE a.trip_id = ? AND a.status = 'accepted'
+        ");
+        $count_stmt->bind_param("i", $trip_id);
+        $count_stmt->execute();
+        $count_result = $count_stmt->get_result()->fetch_assoc();
+        $count_stmt->close();
+
+        if ($count_result['accepted_count'] >= $count_result['group_size_min']) {
+            $confirm_stmt = $conn->prepare("UPDATE trips SET status='confirmed' WHERE id=?");
             $confirm_stmt->bind_param("i", $trip_id);
             $confirm_stmt->execute();
         }
-    } elseif ($action === 'reject') {
-        $stmt = $conn->prepare("UPDATE trip_applications SET status = 'rejected' WHERE id = ?");
-        $stmt->bind_param("i", $app_id);
-        $stmt->execute();
     }
 
     header("Location: manageApplicants.php?trip_id=$trip_id");
     exit;
 }
 
-$apps_stmt = $conn->prepare("SELECT a.*, u.name, u.email, u.age, u.gender FROM trip_applications a JOIN users u ON a.user_id = u.id WHERE a.trip_id = ? ORDER BY a.compatibility_score DESC");
+$accepted_stmt = $conn->prepare("
+    SELECT COUNT(DISTINCT user_id) AS accepted_count 
+    FROM trip_applications 
+    WHERE trip_id = ? AND status = 'accepted'
+");
+$accepted_stmt->bind_param("i", $trip_id);
+$accepted_stmt->execute();
+$accepted_count = $accepted_stmt->get_result()->fetch_assoc()['accepted_count'];
+$accepted_stmt->close();
+
+$apps_stmt = $conn->prepare("
+    SELECT a.*, u.name, u.email, u.age, u.gender 
+    FROM trip_applications a 
+    JOIN users u ON a.user_id = u.id 
+    WHERE a.trip_id = ?
+    ORDER BY a.compatibility_score DESC
+");
 $apps_stmt->bind_param("i", $trip_id);
 $apps_stmt->execute();
 $applications = $apps_stmt->get_result();
@@ -56,6 +115,7 @@ $applications = $apps_stmt->get_result();
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -68,7 +128,7 @@ $applications = $apps_stmt->get_result();
             font-family: 'Segoe UI', sans-serif;
             padding: 30px 0;
         }
-        
+
         .main-content {
             margin-left: 250px;
             padding: 40px;
@@ -257,7 +317,7 @@ $applications = $apps_stmt->get_result();
             <h2 class="trip-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h2>
             <div class="trip-stats">
                 <div class="stat">
-                    <div class="stat-value"><?php echo $trip['accepted_count'] ?? 0; ?></div>
+                    <div class="stat-value"><?php echo $accepted_count ?? 0; ?></div>
                     <div class="stat-label">Accepted</div>
                 </div>
                 <div class="stat">
@@ -302,12 +362,16 @@ $applications = $apps_stmt->get_result();
                             <?php echo ucfirst($app['status']); ?>
                         </span>
                         <?php if ($app['status'] === 'pending'): ?>
-                            <form method="post" style="display: flex; gap: 8px;">
-                                <input type="hidden" name="app_id" value="<?php echo $app['id']; ?>">
-                                <button type="submit" name="action" value="accept" class="btn-sm btn-accept">Accept</button>
-                                <button type="submit" name="action" value="reject" class="btn-sm btn-reject">Reject</button>
-                            </form>
+                            <?php if ($is_host): ?>
+                                <form method="post" style="display: flex; gap: 8px;">
+                                    <input type="hidden" name="app_id" value="<?php echo $app['id']; ?>">
+                                    <button type="submit" name="action" value="accept" class="btn-sm btn-accept">Accept</button>
+                                    <button type="submit" name="action" value="reject" class="btn-sm btn-reject">Reject</button>
+                                </form>
+                            <?php else: ?>
+                            <?php endif; ?>
                         <?php endif; ?>
+
                     </div>
                 </div>
             <?php endwhile; ?>

@@ -8,11 +8,13 @@ if (!isset($_GET['trip_id'])) {
 }
 
 $trip_id = (int)$_GET['trip_id'];
+$user_id = $_SESSION['user_id'] ?? 0;
 
 $trip_stmt = $conn->prepare("SELECT * FROM trips WHERE id = ?");
 $trip_stmt->bind_param("i", $trip_id);
 $trip_stmt->execute();
 $trip = $trip_stmt->get_result()->fetch_assoc();
+$trip_stmt->close();
 
 if (!$trip) {
     header('Location: discoverTrips.php');
@@ -23,6 +25,19 @@ $host_stmt = $conn->prepare("SELECT id, name FROM users WHERE id = ?");
 $host_stmt->bind_param("i", $trip['host_id']);
 $host_stmt->execute();
 $host = $host_stmt->get_result()->fetch_assoc();
+$host_stmt->close();
+
+// Fetch accepted collaborators
+$collab_stmt = $conn->prepare("
+    SELECT u.id, u.name 
+    FROM collaborator_requests cr
+    JOIN users u ON cr.collaborator_id = u.id
+    WHERE cr.trip_id = ? AND cr.status = 'accepted'
+");
+$collab_stmt->bind_param("i", $trip_id);
+$collab_stmt->execute();
+$collaborators = $collab_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$collab_stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -31,7 +46,7 @@ $host = $host_stmt->get_result()->fetch_assoc();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars($trip['trip_name']); ?> - TCFS</title>
+    <title><?= htmlspecialchars($trip['trip_name']) ?> - TCFS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
@@ -141,8 +156,8 @@ $host = $host_stmt->get_result()->fetch_assoc();
         <div class="trip-header">
             <div class="container">
                 <a href="javascript:history.back()" style="color: white; text-decoration: none;"><i class="fas fa-arrow-left"></i> Back</a>
-                <h1 class="trip-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h1>
-                <p class="trip-subtitle"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($trip['destination']); ?></p>
+                <h1 class="trip-title"><?= htmlspecialchars($trip['trip_name']) ?></h1>
+                <p class="trip-subtitle"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($trip['destination']) ?></p>
             </div>
         </div>
 
@@ -152,133 +167,60 @@ $host = $host_stmt->get_result()->fetch_assoc();
                 <div class="info-grid">
                     <div class="info-item">
                         <div class="info-label">Start Date</div>
-                        <div class="info-value"><?php echo date('M d, Y', strtotime($trip['start_date'])); ?></div>
+                        <div class="info-value"><?= date('M d, Y', strtotime($trip['start_date'])) ?></div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">End Date</div>
-                        <div class="info-value"><?php echo date('M d, Y', strtotime($trip['end_date'])); ?></div>
+                        <div class="info-value"><?= date('M d, Y', strtotime($trip['end_date'])) ?></div>
                     </div>
-                    <div class="info-item">
-                        <div class="info-label">Preferred Age</div>
-                        <div class="info-value">
-                            <?php
-                            $age_min = $trip['age_min'];
-                            $age_max = $trip['age_max'];
-
-                            if ($age_min && $age_max) {
-                                echo ($age_min === $age_max)
-                                    ? htmlspecialchars($age_min)
-                                    : htmlspecialchars($age_min) . ' - ' . htmlspecialchars($age_max);
-                            } else {
-                                echo 'Any';
-                            }
-                            ?>
-                        </div>
-                    </div>
-
                     <div class="info-item">
                         <div class="info-label">Duration</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['duration_days']); ?> days</div>
+                        <div class="info-value"><?= htmlspecialchars($trip['duration_days']) ?> days</div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">Budget Range</div>
-                        <div class="info-value">Rs.<?php echo number_format($trip['budget_min']); ?> - Rs.<?php echo number_format($trip['budget_max']); ?></div>
+                        <div class="info-value">Rs.<?= number_format($trip['budget_min']) ?> - Rs.<?= number_format($trip['budget_max']) ?></div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">Travel Mode</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['travel_mode']); ?></div>
+                        <div class="info-value"><?= htmlspecialchars($trip['travel_mode']) ?></div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">Trip Style</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['trip_style']); ?></div>
+                        <div class="info-value"><?= htmlspecialchars($trip['trip_style']) ?></div>
                     </div>
-                    <div class="info-item">
-                        <div class="info-label">Starting Place</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['start_place']); ?></div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Ending Place</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['end_place']); ?></div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Group Size</div>
-                        <div class="info-value">
-                            <?php
-                            $group_size_min = $trip['group_size_min'];
-                            $group_size_max = $trip['group_size_max'];
-
-                            if ($group_size_min && $group_size_max) {
-                                echo ($group_size_min === $group_size_max)
-                                    ? htmlspecialchars($group_size_min)
-                                    : htmlspecialchars($group_size_min) . ' - ' . htmlspecialchars($group_size_max);
-                            } elseif ($group_size_min && !$group_size_max) {
-                                echo htmlspecialchars($group_size_min) . '+';
-                            } else {
-                                echo 'Any';
-                            }
-                            ?>
-                        </div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Preferred Gender</div>
-                        <div class="info-value"><?php echo htmlspecialchars($trip['preferred_gender']); ?></div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-label">Trip Status</div>
-                        <div class="info-value" style="text-transform: capitalize;"><?php echo htmlspecialchars($trip['status']); ?></div>
-                    </div>
-
                 </div>
             </div>
 
             <div class="info-card">
                 <h5>About This Trip</h5>
-                <p class="description"><?php echo htmlspecialchars($trip['description']); ?></p>
+                <p class="description"><?= htmlspecialchars($trip['description']) ?></p>
             </div>
 
             <div class="info-card">
                 <h5>Collaborators</h5>
                 <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; margin-top: 10px;">
+                    <!-- Host -->
+                    <a href="viewProfile.php?user_id=<?= $host['id'] ?>" style="text-decoration: none;">
+                        <div class="host-card" style="width: 200px; text-align: center;">
+                            <i class="fas fa-user" style="font-size: 30px; color: #57C785; margin-bottom: 10px; display: block;"></i>
+                            <div class="host-name"><?= htmlspecialchars($host['name']) ?></div>
+                            <p style="color: #999; margin: 5px 0; font-size: 14px;">Trip Host</p>
+                        </div>
+                    </a>
 
-
-                    <?php if (!empty($trip['host_id'])):
-                        $host_stmt = $conn->prepare("SELECT id, name FROM users WHERE id = ?");
-                        $host_stmt->bind_param("i", $trip['host_id']);
-                        $host_stmt->execute();
-                        $host = $host_stmt->get_result()->fetch_assoc();
-                        if ($host):
-                    ?>
-                            <a href="viewProfile.php?host_id=<?php echo $host['id']; ?>" style="text-decoration: none;">
-                                <div class="host-card" style="width: 200px; text-align: center;">
-                                    <i class="fas fa-user" style="font-size: 30px; color: #57C785; margin-bottom: 10px; display: block;"></i>
-                                    <div class="host-name"><?php echo htmlspecialchars($host['name']); ?></div>
-                                    <p style="color: #999; margin: 5px 0; font-size: 14px;">Trip Host</p>
-                                </div>
-                            </a>
-                    <?php endif;
-                    endif; ?>
-
-                    <?php if (!empty($trip['collaborator_id'])):
-                        $collab_stmt = $conn->prepare("SELECT id, name FROM users WHERE id = ?");
-                        $collab_stmt->bind_param("i", $trip['collaborator_id']);
-                        $collab_stmt->execute();
-                        $collab = $collab_stmt->get_result()->fetch_assoc();
-                        $collab_stmt->close();
-                        if ($collab):
-                    ?>
-                            <a href="viewProfile.php?collaborator_id=<?php echo $collab['id']; ?>" style="text-decoration: none;">
-                                <div class="host-card" style="width: 200px; text-align: center; cursor: pointer;">
-                                    <i class="fas fa-user-gear" style="font-size: 26px; color: #FFB547; margin-bottom: 10px; display: block;"></i>
-                                    <div class="host-name"><?php echo htmlspecialchars($collab['name']); ?></div>
-                                    <p style="color: #999; margin: 5px 0; font-size: 13px;">Volunteer</p>
-                                </div>
-                            </a>
-                    <?php endif;
-                    endif; ?>
-
+                    <!-- Accepted collaborators -->
+                    <?php foreach ($collaborators as $collab): ?>
+                        <a href="viewProfile.php?user_id=<?= $collab['id'] ?>" style="text-decoration: none;">
+                            <div class="host-card" style="width: 200px; text-align: center;">
+                                <i class="fas fa-user-gear" style="font-size: 26px; color: #FFB547; margin-bottom: 10px; display: block;"></i>
+                                <div class="host-name"><?= htmlspecialchars($collab['name']) ?></div>
+                                <p style="color: #999; margin: 5px 0; font-size: 13px;">Volunteer</p>
+                            </div>
+                        </a>
+                    <?php endforeach; ?>
                 </div>
             </div>
-
 
         </div>
     </div>

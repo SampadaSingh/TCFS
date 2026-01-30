@@ -9,14 +9,25 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-$stmt = $conn->prepare("SELECT * FROM trips WHERE host_id = ? ORDER BY start_date DESC");
-$stmt->bind_param("i", $user_id);
+$stmt = $conn->prepare("
+    SELECT t.*,
+           CASE 
+               WHEN t.host_id = ? THEN 'host'
+               WHEN cr.status = 'accepted' THEN 'collaborator'
+           END as user_role
+    FROM trips t
+    LEFT JOIN collaborator_requests cr ON t.id = cr.trip_id AND cr.collaborator_id = ? AND cr.status = 'accepted'
+    WHERE t.host_id = ? OR (cr.collaborator_id = ? AND cr.status = 'accepted')
+    ORDER BY t.start_date DESC
+");
+$stmt->bind_param("iiii", $user_id, $user_id, $user_id, $user_id);
 $stmt->execute();
 $trips = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -87,6 +98,25 @@ $trips = $stmt->get_result();
         .status-cancelled {
             background: #f8d7da;
             color: #721c24;
+        }
+
+        .role-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 10px;
+            display: inline-block;
+        }
+
+        .role-host {
+            background: #57C785;
+            color: white;
+        }
+
+        .role-collaborator {
+            background: #2A7B9B;
+            color: white;
         }
 
         .trip-info {
@@ -208,78 +238,97 @@ $trips = $stmt->get_result();
 
 <body>
     <?php include 'sidebar.php'; ?>
-
     <div class="main-content">
-    <div class="header">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <h2 class="fw-bold mb-0">My Hosted Trips</h2>
-                <a href="createTrip.php" class="btn btn-create"><i class="fas fa-plus"></i> Create Trip</a>
+        <div class="header">
+            <div class="container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="fw-bold mb-0">My Trips</h2>
+                    <a href="createTrip.php" class="btn btn-create"><i class="fas fa-plus"></i> Create Trip</a>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="container mt-4 mb-5">
-        <?php if ($trips->num_rows === 0): ?>
-            <div class="empty-state">
-                <div class="empty-icon">
-                    <i class="fas fa-mountain"></i>
+        <div class="container mt-4 mb-5">
+            <?php if ($trips->num_rows === 0): ?>
+                <div class="empty-state">
+                    <div class="empty-icon"><i class="fas fa-mountain"></i></div>
+                    <h4 class="empty-text">No trips yet</h4>
+                    <p class="text-muted mb-4">Start your journey by creating your first trip</p>
+                    <a href="createTrip.php" class="btn btn-create"><i class="fas fa-plus"></i> Create Trip</a>
                 </div>
-                <h4 class="empty-text">No trips yet</h4>
-                <p class="text-muted mb-4">Start your journey by creating your first trip</p>
-                <a href="createTrip.php" class="btn btn-create"><i class="fas fa-plus"></i> Create Trip</a>
-            </div>
-        <?php else: ?>
-            <?php while ($trip = $trips->fetch_assoc()): ?>
-                <div class="trip-card">
-                    <div class="trip-header">
-                        <div>
-                            <h4 class="trip-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h4>
-                            <p style="color: #999; margin: 5px 0; font-size: 14px;"><?php echo htmlspecialchars($trip['destination']); ?></p>
+            <?php else: ?>
+                <?php while ($trip = $trips->fetch_assoc()): ?>
+                    <?php
+                    $stmt_count = $conn->prepare("SELECT COUNT(DISTINCT user_id) AS accepted_count FROM trip_applications WHERE trip_id = ? AND status = 'accepted'");
+                    $stmt_count->bind_param("i", $trip['id']);
+                    $stmt_count->execute();
+                    $accepted_count_result = $stmt_count->get_result()->fetch_assoc();
+                    $accepted_count = $accepted_count_result['accepted_count'] ?? 0;
+                    ?>
+                    <div class="trip-card">
+                        <div class="trip-header">
+                            <div>
+                                <h4 class="trip-title">
+                                    <?php echo htmlspecialchars($trip['trip_name']); ?>
+                                    <?php if (isset($trip['user_role'])): ?>
+                                        <span class="role-badge role-<?php echo $trip['user_role']; ?>">
+                                            <?php echo ucfirst($trip['user_role']); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </h4>
+                                <p style="color: #999; margin: 5px 0; font-size: 14px;"><?php echo htmlspecialchars($trip['destination']); ?></p>
+                            </div>
+                            <span class="status-badge status-<?php echo strtolower($trip['status']); ?>">
+                                <?php echo ucfirst($trip['status']); ?>
+                            </span>
                         </div>
-                        <span class="status-badge status-<?php echo strtolower($trip['status']); ?>">
-                            <?php echo ucfirst($trip['status']); ?>
-                        </span>
-                    </div>
 
-                    <div class="trip-info">
-                        <div class="info-item">
-                            <span class="info-icon"><i class="fas fa-calendar"></i></span>
-                            <div>
-                                <small style="color: #999;">Dates</small><br>
-                                <?php echo date('M d, Y', strtotime($trip['start_date'])) . ' - ' . date('M d, Y', strtotime($trip['end_date'])); ?>
+                        <div class="trip-info">
+                            <div class="info-item">
+                                <span class="info-icon"><i class="fas fa-calendar"></i></span>
+                                <div>
+                                    <small style="color: #999;">Dates</small><br>
+                                    <?php echo date('M d, Y', strtotime($trip['start_date'])) . ' - ' . date('M d, Y', strtotime($trip['end_date'])); ?>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icon"><i class="fas fa-dollar-sign"></i></span>
+                                <div>
+                                    <small style="color: #999;">Budget</small><br>
+                                    Rs.<?php echo number_format($trip['budget_min']); ?> - Rs.<?php echo number_format($trip['budget_max']); ?>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-icon"><i class="fas fa-users"></i></span>
+                                <div>
+                                    <small style="color: #999;">Group Size</small><br>
+                                    <?php echo $accepted_count; ?> accepted / <?php echo $trip['group_size_min']; ?> - <?php echo $trip['group_size_max']; ?> people
+                                </div>
                             </div>
                         </div>
-                        <div class="info-item">
-                            <span class="info-icon"><i class="fas fa-dollar-sign"></i></span>
-                            <div>
-                                <small style="color: #999;">Budget</small><br>
-                                Rs.<?php echo number_format($trip['budget_min']); ?> - Rs.<?php echo number_format($trip['budget_max']); ?>
-                            </div>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-icon"><i class="fas fa-users"></i></span>
-                            <div>
-                                <small style="color: #999;">Group Size</small><br>
-                                <?php echo $trip['group_size_min']; ?> - <?php echo $trip['group_size_max']; ?> people
-                            </div>
-                        </div>
-                    </div>
 
-                    <div class="trip-actions">
-                        <a href="viewTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-view">
-                            <i class="fas fa-eye"></i> View Details
-                        </a>
-                        <a href="editTrip.php?id=<?php echo $trip['id']; ?>" class="btn-small btn-edit">
-                            <i class="fas fa-pencil-alt"></i> Edit Trip
-                        </a>
-                        <a href="manageApplicants.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-applicants">
-                            <i class="fas fa-users"></i> Applicants (<?php echo $trip['accepted_count'] ?? 0; ?>)
-                        </a>
+                        <div class="trip-actions">
+                            <a href="viewTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-view">
+                                <i class="fas fa-eye"></i> View Details
+                            </a>
+
+                            <?php if ($trip['user_role'] === 'host'): ?>
+                                <a href="editTrip.php?id=<?php echo $trip['id']; ?>" class="btn-small btn-edit">
+                                    <i class="fas fa-pencil-alt"></i> Edit Trip
+                                </a>
+                            <?php endif; ?>
+
+                            <?php if (in_array($trip['user_role'], ['host', 'collaborator'])): ?>
+                                <a href="manageApplicants.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-applicants">
+                                    <i class="fas fa-users"></i> Applicants (<?php echo $accepted_count; ?>)
+                                </a>
+                            <?php endif; ?>
+                        </div>
+
                     </div>
-                </div>
-            <?php endwhile; ?>
-        <?php endif; ?>
+                <?php endwhile; ?>
+            <?php endif; ?>
+        </div>
     </div>
 </body>
 

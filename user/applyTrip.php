@@ -240,15 +240,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="trip-meta">
                     <div class="meta-item">
                         <div class="meta-label">Dates</div>
-                        <div class="meta-value"><?php echo date('M d - d', strtotime($trip['start_date'])) . ' ' . date('Y', strtotime($trip['end_date'])); ?></div>
+                        <div class="meta-value"><?php echo date('M d, Y', strtotime($trip['start_date'])) . ' - ' . date('M d, Y', strtotime($trip['end_date'])); ?></div>
                     </div>
                     <div class="meta-item">
                         <div class="meta-label">Budget</div>
-                        <div class="meta-value">Rs.<?php echo number_format($trip['budget_min']); ?></div>
+                        <div class="meta-value">Rs.<?php echo number_format($trip['budget_min']);?>-<?php echo number_format($trip['budget_max']); ?></div>
                     </div>
                     <div class="meta-item">
                         <div class="meta-label">Group Size</div>
-                        <div class="meta-value"><?php echo $trip['group_size_min']; ?>+ people</div>
+                        <div class="meta-value"><?php echo $trip['group_size_min']; ?>-<?php echo $trip['group_size_max']; ?></div>
                     </div>
                     <div class="meta-item">
                         <div class="meta-label">Travel Mode</div>

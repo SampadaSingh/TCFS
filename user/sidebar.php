@@ -1,5 +1,16 @@
 <?php
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Get pending collaborator requests count
+$pending_count = 0;
+if (isset($_SESSION['user_id'])) {
+    $count_stmt = $conn->prepare("SELECT COUNT(*) as count FROM collaborator_requests WHERE collaborator_id = ? AND status = 'pending'");
+    $count_stmt->bind_param("i", $_SESSION['user_id']);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result()->fetch_assoc();
+    $pending_count = $count_result['count'];
+    $count_stmt->close();
+}
 ?>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -42,6 +53,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
         transition: all 0.3s ease;
         border-left: 4px solid transparent;
         margin: 5px 0;
+        position: relative;
     }
     
     .sidebar .nav-link:hover {
@@ -65,6 +77,16 @@ $current_page = basename($_SERVER['PHP_SELF']);
     
     .sidebar .nav-link i {
         font-size: 18px;
+    }
+    
+    .badge-notification {
+        background: #dc3545;
+        color: white;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: auto;
+        font-weight: 600;
     }
     
     .sidebar .logout-section {
@@ -112,6 +134,14 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <li class="nav-item">
             <a href="tripApplications.php" class="nav-link <?php echo ($current_page == 'tripApplications.php') ? 'active' : ''; ?>">
                 <i class="bi bi-inbox"></i> My Applications
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="collaboratorRequests.php" class="nav-link <?php echo ($current_page == 'collaboratorRequests.php') ? 'active' : ''; ?>">
+                <i class="bi bi-envelope-check"></i> Collaborator Requests
+                <?php if ($pending_count > 0): ?>
+                    <span class="badge-notification"><?php echo $pending_count; ?></span>
+                <?php endif; ?>
             </a>
         </li>
     </ul>

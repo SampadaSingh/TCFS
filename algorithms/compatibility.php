@@ -65,6 +65,8 @@ function calculateModeScore($mode1, $mode2) {
 }
 
 function weightedMatchScore($trip1, $trip2, $interests1, $interests2) {
+    $compatibilityThreshold = 60; // Minimum score for trip recommendations
+
     $dateWeight = 0.35;
     $destinationWeight = 0.30;
     $interestWeight = 0.25;
@@ -104,7 +106,11 @@ function weightedMatchScore($trip1, $trip2, $interests1, $interests2) {
         $modeScore * $modeWeight
     );
     
-    return round($finalScore, 2);
+    if ($finalScore > $compatibilityThreshold) {
+        return round($finalScore, 2);
+    }
+    return 0; 
+
 }
 
 function getUserTrips($conn, $userId) {

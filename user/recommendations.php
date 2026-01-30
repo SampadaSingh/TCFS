@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
-$recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 8, 50);
+$recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 8, 40);
 $recommendedCompanions = getCompanionRecommendations($conn, $user_id, 6, 30);
 $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
 
@@ -142,6 +142,9 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
             margin-top: 15px;
             padding-top: 15px;
             border-top: 1px solid #f0f0f0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .btn-view {
@@ -155,11 +158,40 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
             cursor: pointer;
             transition: all 0.3s ease;
             text-decoration: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            justify-content: center;
+            min-width: 120px;
         }
 
         .btn-view:hover {
             background: #2A7B9B;
+            color: white;
+        }
+
+        .btn-apply {
+            background: #2A7B9B;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            justify-content: center;
+            min-width: 120px;
+        }
+
+        .btn-apply:hover {
+            background: #1a5f7a;
             color: white;
         }
 
@@ -293,8 +325,11 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                                 </div>
                             </div>
                             <div class="card-action">
-                                <a href="viewTrip.php?id=<?php echo $trip['id']; ?>" class="btn-view"><!--the trip id from the host is not being passed-->
+                                <a href="viewTrip.php?id=<?php echo $trip['id']; ?>" class="btn-view">
                                     <i class="bi bi-eye"></i> View Details
+                                </a>
+                                <a href="applyTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-apply">
+                                    <i class="bi bi-send-fill"></i> Apply
                                 </a>
                             </div>
                         </div>
