@@ -170,7 +170,7 @@ function validateTripForm() {
     const start = new Date(startDate);
     const end = new Date(endDate);
     
-    if(end <= start) {
+    if(end < start) {
         showError('error_end_date', 'End date must be after start date');
         isValid = false;
     }

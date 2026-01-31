@@ -51,28 +51,6 @@ function viewUser(userId) {
         });
 }
 
-function editUser(userId) {
-    fetch(`manageUsers.php?action=get&id=${userId}&ajax=1`)
-        .then(response => response.json())
-        .then(data => {
-            if(data.success) {
-                const user = data.user;
-                document.getElementById('edit_user_id').value = user.id;
-                document.getElementById('edit_name').value = user.name;
-                document.getElementById('edit_email').value = user.email;
-                document.getElementById('edit_dob').value = user.dob;
-                document.getElementById('edit_gender').value = user.gender;
-                document.getElementById('edit_bio').value = user.bio || '';
-                openModal('editModal');
-            } else {
-                showToast(data.message, 'error');
-            }
-        })
-        .catch(error => {
-            showToast('Error fetching user details', 'error');
-        });
-}
-
 function deleteUser(userId, userName) {
     if(confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
         const formData = new FormData();
@@ -97,72 +75,6 @@ function deleteUser(userId, userName) {
             showToast('Error deleting user', 'error');
         });
     }
-}
-
-document.getElementById('editUserForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    if(!validateUserForm()) {
-        return;
-    }
-
-    const formData = new FormData(this);
-    formData.append('action', 'update');
-    formData.append('ajax', '1');
-
-    fetch('manageUsers.php', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.success) {
-            showToast(data.message, 'success');
-            closeModal('editModal');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showToast(data.message, 'error');
-        }
-    })
-    .catch(error => {
-        showToast('Error updating user', 'error');
-    });
-});
-
-function validateUserForm() {
-    let isValid = true;
-    clearErrors();
-
-    const name = document.getElementById('edit_name').value.trim();
-    const email = document.getElementById('edit_email').value.trim();
-    const dob = document.getElementById('edit_dob').value;
-
-    if(name.length < 2) {
-        showError('error_name', 'Name must be at least 2 characters');
-        isValid = false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if(!emailRegex.test(email)) {
-        showError('error_email', 'Please enter a valid email address');
-        isValid = false;
-    }
-
-    const dobDate = new Date(dob);
-    const today = new Date();
-    const age = today.getFullYear() - dobDate.getFullYear();
-    
-    if(age < 18) {
-        showError('error_dob', 'User must be at least 18 years old');
-        isValid = false;
-    }
-
-    if(age > 120) {
-        showError('error_dob', 'Please enter a valid date of birth');
-        isValid = false;
-    }
-
-    return isValid;
 }
 
 function formatDate(dateString) {

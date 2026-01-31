@@ -15,18 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
     switch($action) {
         case 'update':
             $id = intval($_POST['trip_id']);
-            $name = $conn->real_escape_string($_POST['name']);
-            $destination = $conn->real_escape_string($_POST['destination']);
-            $description = $conn->real_escape_string($_POST['description']);
-            $start_date = $conn->real_escape_string($_POST['start_date']);
-            $end_date = $conn->real_escape_string($_POST['end_date']);
-            $budget_min = intval($_POST['budget_min']);
-            $budget_max = intval($_POST['budget_max']);
             $status = $conn->real_escape_string($_POST['status']);
 
-            $sql = "UPDATE trips SET trip_name = '$name', destination = '$destination', description = '$description', 
-                    start_date = '$start_date', end_date = '$end_date', budget_min = $budget_min, 
-                    budget_max = $budget_max, status = '$status' WHERE id = $id";
+            $sql = "UPDATE trips SET status = '$status' WHERE id = $id";
             
             if($conn->query($sql)) {
                 echo json_encode(['success' => true, 'message' => 'Trip updated successfully']);
@@ -170,41 +161,41 @@ $trips = $conn->query("SELECT t.id, t.trip_name as trip_name, t.destination, t.s
                     <div class="form-row">
                         <div class="form-group">
                             <label>Trip Name <span class="required">*</span></label>
-                            <input type="text" id="edit_name" name="name" required>
+                            <input type="text" id="edit_name" name="name" required readonly>
                             <span class="error-message" id="error_name"></span>
                         </div>
                         <div class="form-group">
                             <label>Destination <span class="required">*</span></label>
-                            <input type="text" id="edit_destination" name="destination" required>
+                            <input type="text" id="edit_destination" name="destination" required readonly>
                             <span class="error-message" id="error_destination"></span>
                         </div>
                     </div>
                     <div class="form-group">
                         <label>Description <span class="required">*</span></label>
-                        <textarea id="edit_description" name="description" rows="3" required></textarea>
+                        <textarea id="edit_description" name="description" rows="3" required readonly></textarea>
                         <span class="error-message" id="error_description"></span>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Start Date <span class="required">*</span></label>
-                            <input type="date" id="edit_start_date" name="start_date" required>
+                            <input type="date" id="edit_start_date" name="start_date" required readonly>
                             <span class="error-message" id="error_start_date"></span>
                         </div>
                         <div class="form-group">
                             <label>End Date <span class="required">*</span></label>
-                            <input type="date" id="edit_end_date" name="end_date" required>
+                            <input type="date" id="edit_end_date" name="end_date" required readonly>
                             <span class="error-message" id="error_end_date"></span>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Min Budget (Rs.) <span class="required">*</span></label>
-                            <input type="number" id="edit_budget_min" name="budget_min" required>
+                            <input type="number" id="edit_budget_min" name="budget_min" required readonly>
                             <span class="error-message" id="error_budget_min"></span>
                         </div>
                         <div class="form-group">
                             <label>Max Budget (Rs.) <span class="required">*</span></label>
-                            <input type="number" id="edit_budget_max" name="budget_max" required>
+                            <input type="number" id="edit_budget_max" name="budget_max" required readonly>
                             <span class="error-message" id="error_budget_max"></span>
                         </div>
                     </div>

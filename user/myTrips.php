@@ -189,6 +189,17 @@ $trips = $stmt->get_result();
             color: white;
         }
 
+        .btn-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #980413;
+        }
+
+        .btn-danger:hover {
+            background: #980413;
+            color: white;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -321,6 +332,18 @@ $trips = $stmt->get_result();
                             <?php if (in_array($trip['user_role'], ['host', 'collaborator'])): ?>
                                 <a href="manageApplicants.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-applicants">
                                     <i class="fas fa-users"></i> Applicants (<?php echo $accepted_count; ?>)
+                                </a>
+                            <?php endif; ?>
+
+                            <?php if ($trip['user_role'] === 'collaborator'): ?>
+                                <a href="leaveTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-danger" onclick="return confirm('Are you sure you want to leave this trip?');">
+                                    <i class="fas fa-sign-out-alt"></i> Leave Trip
+                                </a>
+                            <?php endif; ?>
+
+                            <?php if ($trip['user_role'] === 'host'): ?>
+                                <a href="deleteTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-small btn-danger" onclick="return confirm('Are you sure you want to delete this trip? This action cannot be undone.');">
+                                    <i class="fas fa-trash-alt"></i> Delete Trip
                                 </a>
                             <?php endif; ?>
                         </div>
