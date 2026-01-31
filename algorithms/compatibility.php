@@ -32,20 +32,28 @@ function calculateInterestScore($interests1, $interests2) {
     return ($common / $total) * 100;
 }
 
-function calculateDestinationScore($dest1, $dest2, $region1, $region2) {
+function calculateDestinationScore($dest1, $dest2) {
     $dest1 = strtolower(trim($dest1));
     $dest2 = strtolower(trim($dest2));
-    $region1 = strtolower(trim($region1));
-    $region2 = strtolower(trim($region2));
-    
+
+    if (empty($dest1) || empty($dest2)) {
+        return 0;
+    }
+
     if ($dest1 === $dest2) {
         return 100;
     }
-    
-    if (!empty($region1) && !empty($region2) && $region1 === $region2) {
-        return 70;
+
+    similar_text($dest1, $dest2, $percent);
+
+    if ($percent >= 70) {
+        return 60; 
     }
-    
+
+    if ($percent >= 40) {
+        return 30; 
+    }
+
     return 0;
 }
 
@@ -87,9 +95,7 @@ function weightedMatchScore($trip1, $trip2, $interests1, $interests2) {
     
     $destinationScore = calculateDestinationScore(
         $trip1['destination'],
-        $trip2['destination'],
-        $trip1['region'] ?? '',
-        $trip2['region'] ?? ''
+        $trip2['destination']
     );
     
     $interestScore = calculateInterestScore($interests1, $interests2);

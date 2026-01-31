@@ -2,27 +2,24 @@
 session_start();
 require "../config/db.php";
 
-// Ensure a logged-in user
 if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit;
 }
 
-// Determine which profile to show
-$user_id = 0;
-$type = '';
+$user_id = null;
 
-if (isset($_GET['collaborator_id'])) {
-    $user_id = (int)$_GET['collaborator_id'];
-    $type = 'Volunteer';
-} elseif (isset($_GET['host_id'])) {
-    $user_id = (int)$_GET['host_id'];
-    $type = 'Host';
-} else {
-    die("Invalid user ID.");
+if (isset($_GET['user_id']) && ctype_digit($_GET['user_id'])) {
+    $user_id = (int) $_GET['user_id'];
 }
 
-// Fetch user info
+if (!$user_id || $user_id <= 0) {
+    http_response_code(400);
+    die("Invalid or missing user ID.");
+}
+
+//invalid id fixation required////////////////////////////////////////////////////////////
+
 $stmt = $conn->prepare("
     SELECT id, name, email, age, gender, bio, location, created_at 
     FROM users 
@@ -37,7 +34,6 @@ if (!$user) {
     die("User not found.");
 }
 
-// Fetch user interests
 $interests = [];
 $stmt = $conn->prepare("
     SELECT i.interest_name 
@@ -124,7 +120,6 @@ $conn->close();
     <div class="profile-header">
         <i class="bi bi-person-circle"></i>
         <h2><?php echo htmlspecialchars($user['name']); ?></h2>
-        <p><?php echo $type; ?> Profile</p>
     </div>
 
     <div class="profile-details">
