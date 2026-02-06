@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $group_size_max = (int) ($_POST['group_size_max'] ?? 0);
     $description = trim($_POST['description']);
     $travel_mode = $_POST['travel_mode'];
-    //$preferred_age = $_POST['preferred_age'] ?? 'Any';
+    $trip_image = null;
     $age_min = (int) ($_POST['age_min'] ?? 0);
     $age_max = (int) ($_POST['age_max'] ?? 0);
     $preferred_gender = $_POST['preferred_gender'] ?? 'Any';
@@ -62,16 +62,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $error = "Trip cannot start in the past.";
         }
 
-        $stmt = $conn->prepare("
-            INSERT INTO trips(
-                host_id, trip_name, destination, start_place, end_place, start_date, end_date,
-                duration_days, travel_mode, budget_label, budget_min, budget_max, group_size_min, group_size_max,
-                preferred_gender, age_min, age_max, trip_style, description, collaborator_id, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-        ");
+        // Handle trip image upload
+        if (isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
+            $fileTmpPath = $_FILES['trip_image']['tmp_name'];
+            $fileName = basename($_FILES['trip_image']['name']);
+            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+
+            $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+            if (in_array($fileExt, $allowedExts)) {
+                $newFileName = uniqid('trip_', true) . '.' . $fileExt;
+                $destPath = '../assets/img/' . $newFileName;
+
+                if (move_uploaded_file($fileTmpPath, $destPath)) {
+                    $trip_image = $newFileName;
+                } else {
+                    $error = "Failed to move uploaded file.";
+                }
+            } else {
+                $error = "Invalid file type. Allowed: jpg, jpeg, png, gif, webp";
+            }
+        }
+
+        if (!$error) {
+            $stmt = $conn->prepare("
+                INSERT INTO trips(
+                    host_id, trip_name, destination, start_place, end_place, start_date, end_date,
+                    duration_days, travel_mode, budget_label, budget_min, budget_max, group_size_min, group_size_max,
+                    preferred_gender, age_min, age_max, trip_style, description, collaborator_id, trip_image, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+            ");
 
         $stmt->bind_param(
-            "issssssississsisissii",
+            "issssssissiiisissiis",
             $user_id,
             $name,
             $destination,
@@ -91,7 +114,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $age_max,
             $trip_style,
             $description,
-            $collaborator_id
+            $collaborator_id,
+            $trip_image
         );
 
         if ($stmt->execute()) {
@@ -99,6 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit;
         } else {
             $error = "Error creating trip: " . $stmt->error;
+        }
         }
     }
 }
@@ -210,7 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <?php if ($error) echo "<div class='alert alert-danger'><i class='fas fa-exclamation-circle'></i> $error</div>"; ?>
 
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             <!-- Trip Details -->
             <div class="form-section">
                 <h5><i class="fas fa-info-circle"></i> Trip Details</h5>
@@ -231,6 +256,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <div class="mb-3 mt-3">
                     <label class="form-label">Description</label>
                     <textarea name="description" class="form-control" rows="4" placeholder="Add trip highlights, stops, or instructions..." required><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Image</label>
+                    <input type="file" name="trip_image" class="form-control">  
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Collaborator / Volunteer (Optional)</label>

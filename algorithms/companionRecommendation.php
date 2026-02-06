@@ -239,7 +239,7 @@ function getCompanionUserInterests($conn, $userId) {
 }
 
 
-function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30) {
+function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 50) {
     $userTrip = getCompanionUserActiveTrip($conn, $userId);
     $preferences = getCompanionUserPreferences($conn, $userId);
     $userInterests = getCompanionUserInterests($conn, $userId);
@@ -338,7 +338,7 @@ function getCompanionRecommendations($conn, $userId, $limit = 10, $minScore = 30
     return array_slice($companions, 0, $limit);
 }
 
-function getCompanionRecommendationsWithBreakdown($conn, $userId, $limit = 10, $minScore = 30) {
+function getCompanionRecommendationsWithBreakdown($conn, $userId, $limit = 10, $minScore = 50) {
     $recommendations = getCompanionRecommendations($conn, $userId, $limit, $minScore);
     
     foreach ($recommendations as &$companion) {

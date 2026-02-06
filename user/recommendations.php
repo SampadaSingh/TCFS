@@ -14,7 +14,7 @@ $user_id = $_SESSION['user_id'];
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
 $recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 8, 40);
-$recommendedCompanions = getCompanionRecommendations($conn, $user_id, 6, 30);
+$recommendedCompanions = getCompanionRecommendations($conn, $user_id, 6, 50);
 $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
 
 

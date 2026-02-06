@@ -29,5 +29,20 @@ if($checkColumn->num_rows == 0) {
     echo "Column 'interests' already exists.";
 }
 
+// Add trip_image column to trips table if it doesn't exist
+$checkTripImage = $conn->query("SHOW COLUMNS FROM trips LIKE 'trip_image'");
+
+if ($checkTripImage->num_rows == 0) {
+    $sql = "ALTER TABLE trips ADD COLUMN trip_image VARCHAR(255) NULL";
+
+    if ($conn->query($sql) === TRUE) {
+        echo "Successfully added 'trip_image' column to trips table.<br>";
+    } else {
+        echo "Error adding trip_image column: " . $conn->error . "<br>";
+    }
+} else {
+    echo "Column 'trip_image' already exists in trips table.<br>";
+}
+
 $conn->close();
 ?>

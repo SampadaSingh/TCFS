@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $travel_mode = isset($_POST['travel_mode']) ? $_POST['travel_mode'] : 'Mixed';
     $trip_style = $_POST['trip_style'] ?? 'Adventure';
     $description = trim($_POST['description'] ?? '');
+    $trip_image = null; // Initialize trip_image
     $age_min = isset($_POST['age_min']) ? (int)$_POST['age_min'] : 0;
     $age_max = isset($_POST['age_max']) ? (int)$_POST['age_max'] : 0;
     $preferred_gender = $_POST['preferred_gender'] ?? 'Any';
@@ -57,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $collaborator_id = !empty($_POST['collaborator_id']) ? intval($_POST['collaborator_id']) : NULL;
     $previous_collaborator = $trip['collaborator_id'];
     $collab_var = $collaborator_id ?? null;
-    
+
     $startdate = strtotime($start_date);
     $enddate = strtotime($end_date);
 
@@ -91,7 +92,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $group_size_label .= '+';
         }*/
+        $trip_image = $trip['trip_image']; // old value
 
+        if (isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
+            $fileTmpPath = $_FILES['trip_image']['tmp_name'];
+            $fileName = basename($_FILES['trip_image']['name']);
+            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+            $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+            if (in_array($fileExt, $allowedExts)) {
+                $newFileName = uniqid('trip_', true) . '.' . $fileExt;
+                $destPath = '../assets/img/' . $newFileName;
+
+                if (move_uploaded_file($fileTmpPath, $destPath)) {
+                    $trip_image = $newFileName; // <-- update the variable for DB
+                }
+            }
+        }
+
+        // Update DB with new filename
+        $stmt = $conn->prepare("UPDATE trips SET trip_image = ? WHERE id = ?");
+        $stmt->bind_param("si", $trip_image, $trip_id);
+        $stmt->execute();
+        $stmt->close();
         $update_stmt = $conn->prepare("
             UPDATE trips SET
                 trip_name = ?,
@@ -113,12 +136,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 trip_style = ?,
                 description = ?,
                 collaborator_id = ?,
+                trip_image = ?,
                 updated_at = NOW()
             WHERE id = ? AND host_id = ?
         ");
 
         $update_stmt->bind_param(
-            "ssssssissisiisiissiii",
+            "ssssssissiiiisissiisii",
             $trip_name,
             $destination,
             $start_place,
@@ -138,20 +162,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $trip_style,
             $description,
             $collab_var,
+            $trip_image,
             $trip_id,
             $user_id
         );
 
+
         if ($update_stmt->execute()) {
             $update_stmt->close();
-            
+
             if ($collaborator_id && $collaborator_id != $previous_collaborator) {
                 $check_req = $conn->prepare("SELECT id, status FROM collaborator_requests WHERE trip_id = ? AND collaborator_id = ?");
                 $check_req->bind_param("ii", $trip_id, $collaborator_id);
                 $check_req->execute();
                 $existing = $check_req->get_result()->fetch_assoc();
                 $check_req->close();
-                
+
                 if (!$existing) {
                     $req_stmt = $conn->prepare("INSERT INTO collaborator_requests (trip_id, host_id, collaborator_id, status) VALUES (?, ?, ?, 'pending')");
                     $req_stmt->bind_param("iii", $trip_id, $user_id, $collaborator_id);
@@ -166,7 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $success = "Collaborator request resent successfully!";
                 }
             }
-            
+
             header("Location: viewTrip.php?id=$trip_id&success=1");
             exit;
         } else {
@@ -192,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $trip['group_size_min'] = $group_size_min;
         $trip['group_size_max'] = $group_size_max;
         $trip['collaborator_id'] = $collaborator_id;
+        $trip['trip_image'] = $trip_image;
     }
 }
 ?>
@@ -366,7 +393,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form method="POST" id="editTripForm">
+            <form method="POST" id="editTripForm" enctype="multipart/form-data">
                 <div class="mb-3">
                     <label class="form-label required">Trip Name</label>
                     <input type="text" name="trip_name" class="form-control"
@@ -531,6 +558,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         placeholder="Describe your trip, activities, and what makes it special..."><?= htmlspecialchars($trip['description']) ?></textarea>
                     <div class="help-text">Provide details about the trip, activities, and expectations.</div>
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Trip Image</label><br>
+
+                    <?php
+                    // Check if there's a valid image filename stored
+                    if (!empty($trip['trip_image']) && $trip['trip_image'] !== '0' && file_exists('../assets/img/' . $trip['trip_image'])): ?>
+                        <img
+                            src="../assets/img/<?= htmlspecialchars($trip['trip_image']) ?>"
+                            alt="Trip Image"
+                            style="max-width: 200px; border-radius: 8px; display:block; margin-bottom:8px;">
+                    <?php endif; ?>
+
+                    <input type="file" name="trip_image" class="form-control" accept="image/*">
+                    <small class="text-muted">Upload a trip image (optional)</small>
+                </div>
+
+
 
                 <?php if (!empty($applicants)): ?>
                     <h5 class="section-title"><i class="fas fa-user-friends"></i> Collaborator / Volunteer</h5>

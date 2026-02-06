@@ -6,11 +6,12 @@ $interests = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
+    $email = strtolower(trim($_POST['email']));
     $password = $_POST['password'];
     $confirm = $_POST['confirm_password'];
     $dob = $_POST['dob'];
     $gender = $_POST['gender'];
+    $bio = trim($_POST['bio'] ?? '');
     $location = $_POST['location'] ?? null;
     $interests = isset($_POST['interests']) ? array_map('intval', $_POST['interests']) : [];
 
@@ -37,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             } else {
                 $hashed = password_hash($password, PASSWORD_DEFAULT);
                 $role = 'User';
-                $stmt = $conn->prepare("INSERT INTO users (name,email,password,dob,gender,role,age,location) VALUES (?,?,?,?,?,?,?,?)");
-                $stmt->bind_param("ssssssis", $name, $email, $hashed, $dob, $gender, $role, $age, $location);
+                $stmt = $conn->prepare("INSERT INTO users (name,email,password,dob,gender,role,age,location,bio) VALUES (?,?,?,?,?,?,?,?,?)");
+                $stmt->bind_param("ssssssiss", $name, $email, $hashed, $dob, $gender, $role, $age, $location, $bio);
 
                 if ($stmt->execute()) {
                     $user_id = $conn->insert_id;
@@ -225,6 +226,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <option value="Female" <?= $gender === 'Female' ? 'selected' : ''; ?>>Female</option>
                     <option value="Other" <?= $gender === 'Other' ? 'selected' : ''; ?>>Other</option>
                 </select>
+            </div>
+            <div class="group">
+                <label for ="bio">Bio:</label>
+                <textarea name="bio" placeholder="Tell us about yourself..." rows="4" style="width:100%; padding:10px; border-radius:8px; border:1px solid #ddd; box-sizing:border-box;"></textarea>
             </div>
 
             <h4>Select Interests (min 3)</h4>

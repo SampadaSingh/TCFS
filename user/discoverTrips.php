@@ -367,10 +367,24 @@ usort($trips_array, function ($a, $b) {
                     $hasApplied = isset($user_applications[$trip_id]);
                     $isFull = ($trip['accepted_count'] ?? 0) >= ($trip['group_size_min'] ?? 0);
                     $isPast = strtotime($trip['start_date']) < strtotime('today');
-                    $score = $trip['compatibility_score']; // Use pre-calculated score
+                    $score = $trip['compatibility_score'];
                 ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="trip-card">
+                            <!-- Trip Image -->
+                             
+                            <?php
+                            // Always try to use the trip_image if it exists, otherwise use placeholder
+                            $imagePath = !empty($trip['trip_image']) 
+                                ? '../assets/img/' . htmlspecialchars($trip['trip_image'])
+                                : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="150"%3E%3Crect fill="%23E8F4F8" width="400" height="150"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%232A7B9B" text-anchor="middle" dy=".3em"%3ENo Trip Image%3C/text%3E%3C/svg%3E';
+                            ?>
+                            <img
+                                src="<?= $imagePath ?>"
+                                alt="Trip Image"
+                                style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;"
+                                onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22150%22%3E%3Crect fill=%22%23E8F4F8%22 width=%22400%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2214%22 fill=%22%232A7B9B%22 text-anchor=%22middle%22 dy=%22.3em%22%3EImage Not Found%3C/text%3E%3C/svg%3E'">
+
                             <div class="trip-body">
                                 <div class="trip-header">
                                     <div>
