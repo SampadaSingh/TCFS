@@ -10,9 +10,7 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['trip_id'])) {
 $user_id = $_SESSION['user_id'];
 $trip_id = (int)$_GET['trip_id'];
 
-$is_host = false;
-$is_collaborator = false;
-
+// Check role: host or collaborator
 $role_stmt = $conn->prepare("
     SELECT 
         t.*,
@@ -40,50 +38,60 @@ if (!$trip || !$trip['role']) {
 $is_host = ($trip['role'] === 'host');
 $is_collaborator = ($trip['role'] === 'collaborator');
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Handle accept/reject actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
 
-    if (!$is_host) {
-        header("Location: manageApplicants.php?trip_id=$trip_id");
-        exit;
+    $action_type = $_POST['action_type'];
+
+    if ($action_type === 'application_action' && $is_host) {
+        $app_id = (int)$_POST['app_id'];
+        $action = $_POST['action'];
+
+        $stmt = $conn->prepare("SELECT status FROM trip_applications WHERE id = ? AND trip_id = ?");
+        $stmt->bind_param("ii", $app_id, $trip_id);
+        $stmt->execute();
+        $application = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($application) {
+            if ($action === 'accept' && $application['status'] !== 'accepted') {
+                $u = $conn->prepare("UPDATE trip_applications SET status='accepted' WHERE id=?");
+                $u->bind_param("i", $app_id);
+                $u->execute();
+            }
+
+            if ($action === 'reject' && $application['status'] !== 'rejected') {
+                $u = $conn->prepare("UPDATE trip_applications SET status='rejected' WHERE id=?");
+                $u->bind_param("i", $app_id);
+                $u->execute();
+            }
+
+            $count_stmt = $conn->prepare("
+                SELECT COUNT(DISTINCT user_id) AS accepted_count, t.group_size_min
+                FROM trip_applications a
+                JOIN trips t ON a.trip_id = t.id
+                WHERE a.trip_id = ? AND a.status = 'accepted'
+            ");
+            $count_stmt->bind_param("i", $trip_id);
+            $count_stmt->execute();
+            $count_result = $count_stmt->get_result()->fetch_assoc();
+            $count_stmt->close();
+
+            if ($count_result['accepted_count'] >= $count_result['group_size_min']) {
+                $confirm_stmt = $conn->prepare("UPDATE trips SET status='confirmed' WHERE id=?");
+                $confirm_stmt->bind_param("i", $trip_id);
+                $confirm_stmt->execute();
+            }
+        }
     }
 
-    $app_id = (int)$_POST['app_id'];
-    $action = $_POST['action'];
-
-    $stmt = $conn->prepare("SELECT status FROM trip_applications WHERE id = ? AND trip_id = ?");
-    $stmt->bind_param("ii", $app_id, $trip_id);
-    $stmt->execute();
-    $application = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-
-    if ($application) {
-        if ($action === 'accept' && $application['status'] !== 'accepted') {
-            $u = $conn->prepare("UPDATE trip_applications SET status='accepted' WHERE id=?");
-            $u->bind_param("i", $app_id);
-            $u->execute();
-        }
-
-        if ($action === 'reject' && $application['status'] !== 'rejected') {
-            $u = $conn->prepare("UPDATE trip_applications SET status='rejected' WHERE id=?");
-            $u->bind_param("i", $app_id);
-            $u->execute();
-        }
-
-        $count_stmt = $conn->prepare("
-            SELECT COUNT(DISTINCT user_id) AS accepted_count, t.group_size_min
-            FROM trip_applications a
-            JOIN trips t ON a.trip_id = t.id
-            WHERE a.trip_id = ? AND a.status = 'accepted'
-        ");
-        $count_stmt->bind_param("i", $trip_id);
-        $count_stmt->execute();
-        $count_result = $count_stmt->get_result()->fetch_assoc();
-        $count_stmt->close();
-
-        if ($count_result['accepted_count'] >= $count_result['group_size_min']) {
-            $confirm_stmt = $conn->prepare("UPDATE trips SET status='confirmed' WHERE id=?");
-            $confirm_stmt->bind_param("i", $trip_id);
-            $confirm_stmt->execute();
+    if ($action_type === 'send_message' && $is_host) {
+        $recipient_id = (int)$_POST['recipient_id'];
+        $message_text = trim($_POST['message']);
+        if (!empty($message_text)) {
+            $msg_stmt = $conn->prepare("INSERT INTO contact_requests (sender_id, recipient_id, trip_id, message) VALUES (?, ?, ?, ?)");
+            $msg_stmt->bind_param("iiis", $user_id, $recipient_id, $trip_id, $message_text);
+            $msg_stmt->execute();
         }
     }
 
@@ -101,6 +109,7 @@ $accepted_stmt->execute();
 $accepted_count = $accepted_stmt->get_result()->fetch_assoc()['accepted_count'];
 $accepted_stmt->close();
 
+// Fetch all applications
 $apps_stmt = $conn->prepare("
     SELECT a.*, u.name, u.email, u.age, u.gender 
     FROM trip_applications a 
@@ -179,9 +188,16 @@ $applications = $apps_stmt->get_result();
             border-radius: 12px;
             margin-bottom: 15px;
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .app-header {
+            display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex-wrap: wrap;
         }
 
         .app-left {
@@ -200,12 +216,14 @@ $applications = $apps_stmt->get_result();
             gap: 20px;
             font-size: 13px;
             color: #666;
+            flex-wrap: wrap;
         }
 
         .app-right {
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
         }
 
         .score {
@@ -281,28 +299,52 @@ $applications = $apps_stmt->get_result();
             background: #c82333;
         }
 
+        .message-box {
+            background: #f5f7fa;
+            padding: 12px;
+            border-radius: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .message-item {
+            margin-bottom: 8px;
+        }
+
+        .message-sender {
+            font-weight: 700;
+        }
+
+        .message-text {
+            margin-left: 8px;
+        }
+
+        .message-form textarea {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 6px;
+            resize: vertical;
+        }
+
+        .message-form button {
+            margin-top: 6px;
+            background: #57C785;
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
         .empty {
             text-align: center;
             padding: 40px;
             background: white;
             border-radius: 12px;
-        }
-
-        @media (max-width: 768px) {
-            .trip-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .app-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
-
-            .app-right {
-                width: 100%;
-                justify-content: space-between;
-            }
         }
     </style>
 </head>
@@ -344,35 +386,60 @@ $applications = $apps_stmt->get_result();
         <?php else: ?>
             <?php while ($app = $applications->fetch_assoc()): ?>
                 <div class="app-item">
-                    <div class="app-left">
-                        <div class="app-name"><?php echo htmlspecialchars($app['name']); ?></div>
-                        <div class="app-meta">
-                            <span><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($app['email']); ?></span>
-                            <span><i class="fas fa-birthday-cake"></i> <?php echo $app['age']; ?> years</span>
-                            <span><i class="fas fa-venus-mars"></i> <?php echo ucfirst($app['gender']); ?></span>
+                    <div class="app-header">
+                        <div class="app-left">
+                            <div class="app-name"><?php echo htmlspecialchars($app['name']); ?></div>
+                            <div class="app-meta">
+                                <span><i class="fas fa-envelope"></i> <?php echo htmlspecialchars($app['email']); ?></span>
+                                <span><i class="fas fa-birthday-cake"></i> <?php echo $app['age']; ?> years</span>
+                                <span><i class="fas fa-venus-mars"></i> <?php echo ucfirst($app['gender']); ?></span>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="app-right">
-                        <div class="score">
-                            <div class="score-num"><?php echo $app['compatibility_score']; ?>%</div>
-                            <div class="score-label">Match</div>
-                        </div>
-                        <span class="status-badge status-<?php echo strtolower($app['status']); ?>">
-                            <?php echo ucfirst($app['status']); ?>
-                        </span>
-                        <?php if ($app['status'] === 'pending'): ?>
-                            <?php if ($is_host): ?>
-                                <form method="post" style="display: flex; gap: 8px;">
+                        <div class="app-right">
+                            <div class="score">
+                                <div class="score-num"><?php echo $app['compatibility_score']; ?>%</div>
+                                <div class="score-label">Match</div>
+                            </div>
+                            <span class="status-badge status-<?php echo strtolower($app['status']); ?>"><?php echo ucfirst($app['status']); ?></span>
+                            <?php if ($app['status'] === 'pending' && $is_host): ?>
+                                <form method="post" style="display:flex; gap:8px;">
+                                    <input type="hidden" name="action_type" value="application_action">
                                     <input type="hidden" name="app_id" value="<?php echo $app['id']; ?>">
                                     <button type="submit" name="action" value="accept" class="btn-sm btn-accept">Accept</button>
                                     <button type="submit" name="action" value="reject" class="btn-sm btn-reject">Reject</button>
                                 </form>
-                            <?php else: ?>
                             <?php endif; ?>
-                        <?php endif; ?>
-
+                        </div>
                     </div>
+
+                    <?php if ($is_host): ?>
+                        <?php
+                        $msg_stmt = $conn->prepare("SELECT cr.*, u.name AS sender_name FROM contact_requests cr JOIN users u ON cr.sender_id = u.id WHERE cr.trip_id=? AND ((cr.sender_id=? AND cr.recipient_id=?) OR (cr.sender_id=? AND cr.recipient_id=?)) ORDER BY cr.created_at ASC");
+                        $msg_stmt->bind_param("iiiii", $trip_id, $app['user_id'], $user_id, $user_id, $app['user_id']);
+                        $msg_stmt->execute();
+                        $messages = $msg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                        ?>
+                        <div class="message-box">
+                            <?php if (empty($messages)): ?>
+                                <div style="color:#999; font-size:12px;">No messages yet.</div>
+                            <?php else: ?>
+                                <?php foreach ($messages as $msg): ?>
+                                    <div class="message-item">
+                                        <span class="message-sender"><?php echo htmlspecialchars($msg['sender_name']); ?>:</span>
+                                        <span class="message-text"><?php echo htmlspecialchars($msg['message']); ?></span>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Message form -->
+                        <form method="post" class="message-form">
+                            <input type="hidden" name="action_type" value="send_message">
+                            <input type="hidden" name="recipient_id" value="<?php echo $app['user_id']; ?>">
+                            <textarea name="message" rows="2" placeholder="Send a message to <?php echo htmlspecialchars($app['name']); ?>" required></textarea>
+                            <button type="submit">Send</button>
+                        </form>
+                    <?php endif; ?>
                 </div>
             <?php endwhile; ?>
         <?php endif; ?>
