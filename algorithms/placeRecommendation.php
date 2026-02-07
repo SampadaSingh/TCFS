@@ -74,75 +74,52 @@ function findCompatibleUsers($conn, $currentUserId, $minCompatibility = 40) {
     return $compatibleUsers;
 }
 
-function getCompatibleUsersDestinations($conn, $compatibleUserIds) {
-    if (empty($compatibleUserIds)) {
-        return [];
-    }
+function getCompatibleUsersPreferredDestinations($conn, $compatibleUserIds) {
+    if (empty($compatibleUserIds)) return [];
 
     $placeholders = implode(',', array_fill(0, count($compatibleUserIds), '?'));
+    $types = str_repeat('i', count($compatibleUserIds));
+
     $query = "
-        SELECT DISTINCT t.destination, u.id, u.name
-        FROM trips t
-        JOIN users u ON t.host_id = u.id
-        WHERE u.id IN ($placeholders)
-          AND t.destination IS NOT NULL
-          AND TRIM(t.destination) <> ''
+        SELECT up.user_id, u.name, up.preferred_destination
+        FROM user_preferences up
+        JOIN users u ON up.user_id = u.id
+        WHERE up.user_id IN ($placeholders)
+          AND up.preferred_destination IS NOT NULL
+          AND TRIM(up.preferred_destination) <> ''
     ";
 
     $stmt = $conn->prepare($query);
-    $stmt->bind_param(str_repeat('i', count($compatibleUserIds)), ...$compatibleUserIds);
+    $stmt->bind_param($types, ...$compatibleUserIds);
     $stmt->execute();
     $result = $stmt->get_result();
 
     $destinations = [];
+
     while ($row = $result->fetch_assoc()) {
-        $dest = strtolower(trim($row['destination']));
-        if (!isset($destinations[$dest])) {
-            $destinations[$dest] = [
-                'destination' => $row['destination'],
-                'visited_by' => []
-            ];
+        $prefs = explode(',', $row['preferred_destination']);
+        foreach ($prefs as $pref) {
+            $dest = strtolower(trim($pref));
+            if ($dest === '') continue;
+
+            if (!isset($destinations[$dest])) {
+                $destinations[$dest] = [
+                    'destination' => $pref,
+                    'visited_by' => []
+                ];
+            }
+            $destinations[$dest]['visited_by'][] = $row['name'];
         }
-        $destinations[$dest]['visited_by'][] = $row['name'];
     }
 
     return $destinations;
 }
 
-function recommendPlacesForUser($conn, $currentUserId, $limit = 10) {
-    $currentUserVisited = getUserVisitedDestinations($conn, $currentUserId);
-    $currentUserPreference = getUserPreferredDestination($conn, $currentUserId);
-    $compatibleUsers = findCompatibleUsers($conn, $currentUserId, 40);
-    
-    $destinationScores = [];
-    
-    if (!empty($compatibleUsers)) {
-        $compatibleUserIds = array_column($compatibleUsers, 'id');
-        $compatibleDestinations = getCompatibleUsersDestinations($conn, $compatibleUserIds);
-        
-        foreach ($compatibleDestinations as $dest => $data) {
-            if (!in_array($dest, $currentUserVisited)) {
-                if (!isset($destinationScores[$dest])) {
-                    $destinationScores[$dest] = [
-                        'destination' => $data['destination'],
-                        'score' => 0,
-                        'visited_by' => $data['visited_by'],
-                        'reason' => ''
-                    ];
-                }
-                
-                $visitCount = count($data['visited_by']);
-                $destinationScores[$dest]['score'] += ($visitCount * 10);
-                $destinationScores[$dest]['reason'] = sprintf(
-                    'Visited by %d compatible traveler%s',
-                    $visitCount,
-                    $visitCount > 1 ? 's' : ''
-                );
-            }
-        }
-    }
-    
-    if (empty($destinationScores)) {
+
+function recommendPlacesForUser($conn, $currentUserId, $limit = 10, $minCompatibility = 40) {
+    $compatibleUsers = findCompatibleUsers($conn, $currentUserId, $minCompatibility);
+
+    if (empty($compatibleUsers)) {
         $query = "
             SELECT destination, COUNT(*) as popularity
             FROM trips
@@ -157,37 +134,69 @@ function recommendPlacesForUser($conn, $currentUserId, $limit = 10) {
         $stmt->bind_param("i", $limit);
         $stmt->execute();
         $result = $stmt->get_result();
-        
+
         $recommendations = [];
         while ($row = $result->fetch_assoc()) {
-            $dest = strtolower(trim($row['destination']));
-            if ($dest !== '' && !in_array($dest, $currentUserVisited)) {
-                $recommendations[] = [
-                    'destination' => $row['destination'],
-                    'score' => 50,
-                    'visited_by' => [],
-                    'reason' => 'Popular destination'
+            $recommendations[] = [
+                'destination' => $row['destination'],
+                'score' => 50,
+                'preferred_by' => [],
+                'reason' => 'Popular destination'
+            ];
+        }
+        return $recommendations;
+    }
+
+    $destinationScores = [];
+    foreach ($compatibleUsers as $user) {
+        $userId = $user['id'];
+        $userRow = $conn->query("SELECT preferred_destination FROM user_preferences WHERE user_id = $userId")->fetch_assoc();
+        if (!$userRow || empty($userRow['preferred_destination'])) continue;
+
+        $preferredDestinations = array_map('trim', explode(',', $userRow['preferred_destination']));
+        foreach ($preferredDestinations as $dest) {
+            $destLower = strtolower($dest);
+            if (!isset($destinationScores[$destLower])) {
+                $destinationScores[$destLower] = [
+                    'destination' => $dest,
+                    'score' => 0,
+                    'preferred_by' => []
                 ];
             }
+            $destinationScores[$destLower]['score'] += 10; 
+            $destinationScores[$destLower]['preferred_by'][] = $user['name'];
         }
-        return array_slice($recommendations, 0, $limit);
     }
-    
+
+    $currentUserVisited = getUserVisitedDestinations($conn, $currentUserId);
+    foreach ($currentUserVisited as $visited) {
+        $visitedLower = strtolower($visited);
+        if (isset($destinationScores[$visitedLower])) {
+            unset($destinationScores[$visitedLower]);
+        }
+    }
+
     $recommendations = [];
     foreach ($destinationScores as $data) {
+        $count = count($data['preferred_by']);
         $recommendations[] = [
             'destination' => $data['destination'],
-            'score' => round($data['score'], 2),
-            'visited_by' => array_slice($data['visited_by'], 0, 3),
-            'reason' => $data['reason']
+            'score' => $data['score'],
+            'preferred_by' => array_slice($data['preferred_by'], 0, 3), 
+            'reason' => sprintf(
+                'Preferred by %d compatible traveler%s',
+                $count,
+                $count > 1 ? 's' : ''
+            )
         ];
     }
-    
+
     usort($recommendations, function($a, $b) {
         return $b['score'] <=> $a['score'];
     });
-    
+
     return array_slice($recommendations, 0, $limit);
 }
+
 
 ?>

@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
+// Fetch current user info
 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -23,19 +24,22 @@ if (!$user) {
 $message = '';
 $message_type = '';
 
+// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name']);
     $bio = trim($_POST['bio']);
+    $old_password = trim($_POST['old_password'] ?? '');
+    $new_password = trim($_POST['new_password'] ?? '');
+    $confirm_password = trim($_POST['confirm_password'] ?? '');
     $submittedInterests = $_POST['interests'] ?? [];
 
+    // Process Interests
     $submittedInterests = array_unique(array_map('intval', $submittedInterests));
-
     $currentInterests = [];
     $res = $conn->query("SELECT interest_id FROM user_interests WHERE user_id = $user_id");
     while ($row = $res->fetch_assoc()) {
         $currentInterests[] = (int)$row['interest_id'];
     }
-
     $toAdd = array_diff($submittedInterests, $currentInterests);
     $toRemove = array_diff($currentInterests, $submittedInterests);
 
@@ -43,22 +47,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $toRemoveList = implode(',', $toRemove);
         $conn->query("DELETE FROM user_interests WHERE user_id = $user_id AND interest_id IN ($toRemoveList)");
     }
-
     foreach ($toAdd as $interestId) {
-        $interestId = (int)$interestId;
         $conn->query("INSERT INTO user_interests (user_id, interest_id) VALUES ($user_id, $interestId)");
     }
 
+    // Update name and bio
     if (!empty($name)) {
         $update_stmt = $conn->prepare("UPDATE users SET name = ?, bio = ? WHERE id = ?");
         $update_stmt->bind_param("ssi", $name, $bio, $user_id);
-
         if ($update_stmt->execute()) {
             $user['name'] = $name;
             $user['bio'] = $bio;
-
-            header('Location: profile.php?success=1');
-            exit;
+            $message = 'Profile updated successfully.';
+            $message_type = 'success';
         } else {
             $message = 'Error updating profile. Please try again.';
             $message_type = 'error';
@@ -67,10 +68,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message = 'Name cannot be empty.';
         $message_type = 'error';
     }
+
+    // Handle password change if new password is entered
+    if (!empty($new_password)) {
+        if (empty($old_password)) {
+            $message = 'Please enter your current password to change it.';
+            $message_type = 'error';
+        } elseif (!password_verify($old_password, $user['password'])) {
+            $message = 'Current password is incorrect.';
+            $message_type = 'error';
+        } elseif (strlen($new_password) < 6) {
+            $message = 'New password must be at least 6 characters.';
+            $message_type = 'error';
+        } elseif ($new_password !== $confirm_password) {
+            $message = 'New passwords do not match.';
+            $message_type = 'error';
+        } else {
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $pass_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $pass_stmt->bind_param("si", $hashed_password, $user_id);
+            $pass_stmt->execute();
+            $message = 'Password updated successfully.';
+            $message_type = 'success';
+        }
+    }
 }
 
+// Fetch all interests for checkboxes
 $allInterests = $conn->query("SELECT id, interest_name FROM interests ORDER BY interest_name ASC");
 
+// Fetch selected interests
 $selected = [];
 $res = $conn->query("SELECT interest_id FROM user_interests WHERE user_id = $user_id");
 while ($r = $res->fetch_assoc()) {
@@ -172,9 +199,18 @@ while ($r = $res->fetch_assoc()) {
             border-radius: 8px;
             margin-bottom: 20px;
         }
+
         .form-check-input:checked {
             background-color: #57C785;
             border-color: #57C785;
+        }
+
+        .section-title {
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-weight: 700;
+            color: #2A7B9B;
+            font-size: 18px;
         }
     </style>
 </head>
@@ -210,12 +246,13 @@ while ($r = $res->fetch_assoc()) {
                 <div class="mb-3">
                     <label class="form-label">Gender</label>
                     <input type="text" class="form-control" name="gender" value="<?= htmlspecialchars($user['gender'] ?? ''); ?>" disabled>
-                </div>  
+                </div>
                 <div class="mb-3">
                     <label class="form-label">Bio</label>
                     <textarea class="form-control" name="bio" placeholder="Tell others about yourself..."><?= htmlspecialchars($user['bio'] ?? ''); ?></textarea>
                 </div>
 
+                <!-- Interests -->
                 <div class="mb-3">
                     <label class="form-label">Interests</label>
                     <div class="row">
@@ -234,6 +271,21 @@ while ($r = $res->fetch_assoc()) {
                         <?php endwhile; ?>
                     </div>
                     <div class="form-info">Select your interests</div>
+                </div>
+
+                <!-- Change Password Section -->
+                <div class="section-title">Change Password</div>
+                <div class="mb-3">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" class="form-control" name="old_password" placeholder="Enter current password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">New Password</label>
+                    <input type="password" class="form-control" name="new_password" placeholder="Enter new password">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" name="confirm_password" placeholder="Confirm new password">
                 </div>
 
                 <button type="submit" class="btn-save">Save Changes</button>

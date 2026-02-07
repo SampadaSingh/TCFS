@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ");
 
         $stmt->bind_param(
-            "issssssissiiiississsi",
+            "issssssssssiiiississs",
             $user_id,
             $name,
             $destination,

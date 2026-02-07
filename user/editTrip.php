@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
 
         $update_stmt->bind_param(
-            "ssssssissiiiisissiisii",
+            "ssssssissiiiisiissisii",
             $trip_name,
             $destination,
             $start_place,

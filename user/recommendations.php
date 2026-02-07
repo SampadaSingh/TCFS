@@ -348,7 +348,7 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
             <?php else: ?>
                 <div class="empty-state">
                     <i class="bi bi-inbox"></i>
-                    <p>No trip recommendations available. Create your first trip to get started!</p>
+                    <p>No trip recommendations available.</p>
                 </div>
             <?php endif; ?>
         </div>

@@ -4,7 +4,6 @@ require_once '../../config/db.php';
 require_once '../../algorithms/tripRecommendation.php';
 
 try {
-    // Validate input
     if (!isset($_GET['user_id'])) {
         throw new Exception('user_id parameter is required');
     }
@@ -14,7 +13,6 @@ try {
     $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
     $minScore = isset($_GET['min_score']) ? (int)$_GET['min_score'] : 60;
 
-    // Validate user exists
     $userCheck = $conn->prepare("SELECT id FROM users WHERE id = ?");
     $userCheck->bind_param("i", $userId);
     $userCheck->execute();
@@ -22,7 +20,6 @@ try {
         throw new Exception('User not found');
     }
 
-    // Get recommendations
     $recommendations = getPersonalizedTripRecommendations(
         $conn,
         $userId,
@@ -31,7 +28,6 @@ try {
         $minScore
     );
 
-    // Return response
     echo json_encode([
         'success' => true,
         'user_id' => $userId,

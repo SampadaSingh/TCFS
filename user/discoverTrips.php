@@ -13,16 +13,16 @@ $filter_destination = $_GET['destination'] ?? '';
 $filter_budget = $_GET['budget'] ?? '';
 
 $query = "SELECT t.*, 
-                (SELECT COUNT(*) FROM trip_applications WHERE trip_id = t.id AND status = 'accepted') as accepted_count
+                (SELECT COUNT(*) FROM trip_applications WHERE trip_id = t.id AND status = 'Accepted') as accepted_count
           FROM trips t 
-          WHERE t.host_id != ? AND t.status IN ('pending', 'confirmed') AND t.start_date >= CURDATE()";
+          WHERE t.host_id != ? AND t.status IN ('pending','confirmed') AND t.start_date >= CURDATE()";
 $params = [$user_id];
 $types = "i";
 
 if ($filter_destination) {
     $query .= " AND t.destination LIKE ?";
     $search = "%$filter_destination%";
-    $params = array_merge($params, [$search]);
+    $params[] = $search;
     $types .= "s";
 }
 
@@ -30,7 +30,7 @@ if ($filter_budget) {
     if (strpos($filter_budget, '+') !== false) {
         $min = (int)str_replace([',', '+'], '', $filter_budget);
         $query .= " AND t.budget_min >= ?";
-        $params = array_merge($params, [$min]);
+        $params[] = $min;
         $types .= "i";
     } else {
         list($min, $max) = explode('-', $filter_budget);
@@ -43,13 +43,11 @@ if ($filter_budget) {
 }
 
 $query .= " ORDER BY t.start_date ASC";
-
 $stmt = $conn->prepare($query);
 $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $trips = $stmt->get_result();
 
-// Fetch all trips into array and get trip IDs
 $trip_ids = [];
 $trips_array = [];
 while ($trip = $trips->fetch_assoc()) {
@@ -57,7 +55,6 @@ while ($trip = $trips->fetch_assoc()) {
     $trip_ids[] = $trip['id'];
 }
 
-// Fetch all user applications in one query to avoid N+1 problem
 $user_applications = [];
 if (!empty($trip_ids)) {
     $placeholders = implode(',', array_fill(0, count($trip_ids), '?'));
@@ -72,7 +69,6 @@ if (!empty($trip_ids)) {
     }
 }
 
-// Get current user details for compatibility scoring
 $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
 $user_stmt->bind_param("i", $user_id);
 $user_stmt->execute();
@@ -86,6 +82,20 @@ unset($trip);
 usort($trips_array, function ($a, $b) {
     return $b['compatibility_score'] <=> $a['compatibility_score'];
 });
+
+$acceptedTrips = [];
+$accepted_stmt = $conn->prepare("
+    SELECT t.start_date, t.end_date 
+    FROM trip_applications ta
+    JOIN trips t ON t.id = ta.trip_id
+    WHERE ta.user_id = ? AND ta.status = 'Accepted'
+");
+$accepted_stmt->bind_param("i", $user_id);
+$accepted_stmt->execute();
+$accepted_result = $accepted_stmt->get_result();
+while ($row = $accepted_result->fetch_assoc()) {
+    $acceptedTrips[] = $row;
+}
 ?>
 
 <!DOCTYPE html>
@@ -100,7 +110,7 @@ usort($trips_array, function ($a, $b) {
     <style>
         body {
             background-color: #E8F4F8;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             margin: 0;
             padding: 0;
         }
@@ -136,10 +146,9 @@ usort($trips_array, function ($a, $b) {
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s;
             display: flex;
             flex-direction: column;
-            height: 100%;
+            transition: all 0.3s;
         }
 
         .trip-card:hover {
@@ -195,45 +204,6 @@ usort($trips_array, function ($a, $b) {
             text-align: center;
         }
 
-        .trip-description {
-            color: #777;
-            font-size: 14px;
-            margin-bottom: 15px;
-            line-height: 1.5;
-        }
-
-        .applicants-section {
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #e5e5e5;
-        }
-
-        .applicants-label {
-            font-size: 12px;
-            color: #999;
-            margin: 0 0 8px 0;
-            font-weight: 600;
-        }
-
-        .applicants-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-
-        .applicant-badge {
-            font-size: 11px;
-            background: #E8F4F8;
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: #333;
-        }
-
-        .applicant-more {
-            font-size: 11px;
-            color: #999;
-        }
-
         .trip-footer {
             padding-top: 15px;
             border-top: 1px solid #e5e5e5;
@@ -247,11 +217,6 @@ usort($trips_array, function ($a, $b) {
             display: flex;
             gap: 8px;
             align-items: center;
-        }
-
-        .group-progress {
-            font-size: 12px;
-            color: #999;
         }
 
         .btn-apply {
@@ -298,24 +263,7 @@ usort($trips_array, function ($a, $b) {
             opacity: 0.7;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            background: white;
-            border-radius: 12px;
-        }
-
-        .empty-icon {
-            font-size: 48px;
-            color: #ccc;
-            margin-bottom: 15px;
-        }
-
         @media (max-width: 768px) {
-            .trip-details {
-                grid-template-columns: 1fr;
-            }
-
             .main-content {
                 margin-left: 0;
                 padding: 20px;
@@ -326,15 +274,12 @@ usort($trips_array, function ($a, $b) {
 
 <body>
     <?php include 'sidebar.php'; ?>
-
     <div class="main-content">
         <h2 class="fw-bold mb-4">Discover Trips</h2>
 
         <div class="filter-section">
             <form method="get" class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" name="destination" class="filter-input w-100" placeholder="Search destination..." value="<?php echo htmlspecialchars($filter_destination); ?>">
-                </div>
+                <div class="col-md-4"><input type="text" name="destination" class="filter-input w-100" placeholder="Search destination..." value="<?php echo htmlspecialchars($filter_destination); ?>"></div>
                 <div class="col-md-4">
                     <select name="budget" class="filter-input w-100">
                         <option value="">All Budgets</option>
@@ -348,15 +293,13 @@ usort($trips_array, function ($a, $b) {
                         <option value="100000+" <?php echo $filter_budget === '100000+' ? 'selected' : ''; ?>>NRS 100,000+</option>
                     </select>
                 </div>
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-apply w-100"><i class="fas fa-search"></i> Search</button>
-                </div>
+                <div class="col-md-4"><button type="submit" class="btn btn-apply w-100"><i class="fas fa-search"></i> Search</button></div>
             </form>
         </div>
 
         <?php if (empty($trips_array)): ?>
-            <div class="empty-state">
-                <div class="empty-icon"><i class="fas fa-search"></i></div>
+            <div class="empty-state text-center py-5 bg-white rounded">
+                <div class="empty-icon"><i class="fas fa-search fa-3x text-muted"></i></div>
                 <h4>No trips found</h4>
                 <p class="text-muted">Try adjusting your filters</p>
             </div>
@@ -368,106 +311,47 @@ usort($trips_array, function ($a, $b) {
                     $isFull = ($trip['accepted_count'] ?? 0) >= ($trip['group_size_min'] ?? 0);
                     $isPast = strtotime($trip['start_date']) < strtotime('today');
                     $score = $trip['compatibility_score'];
+
+                    $hasConflict = false;
+                    foreach ($acceptedTrips as $at) {
+                        if (!($trip['end_date'] < $at['start_date'] || $trip['start_date'] > $at['end_date'])) {
+                            $hasConflict = true;
+                            break;
+                        }
+                    }
                 ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="trip-card">
-                            <?php
-                            $imagePath = !empty($trip['trip_image']) 
-                                ? '../assets/img/' . htmlspecialchars($trip['trip_image'])
-                                : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="150"%3E%3Crect fill="%23E8F4F8" width="400" height="150"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%232A7B9B" text-anchor="middle" dy=".3em"%3ENo Trip Image%3C/text%3E%3C/svg%3E';
-                            ?>
-                            <img
-                                src="<?= $imagePath ?>"
-                                alt="Trip Image"
-                                style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;"
-                                onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22150%22%3E%3Crect fill=%22%23E8F4F8%22 width=%22400%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2214%22 fill=%22%232A7B9B%22 text-anchor=%22middle%22 dy=%22.3em%22%3EImage Not Found%3C/text%3E%3C/svg%3E'">
-
-                            <div class="trip-body">
-                                <div class="trip-header">
-                                    <div>
-                                        <h5 class="trip-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h5>
-                                        <p class="trip-destination"><i class="fas fa-map-marker-alt"></i> <?php echo htmlspecialchars($trip['destination']); ?></p>
-                                    </div>
-                                    <span class="trip-score"><?php echo $score; ?>%</span>
+                            <?php $imagePath = !empty($trip['trip_image']) ? '../assets/img/' . htmlspecialchars($trip['trip_image']) : 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="150"><rect fill="%23E8F4F8" width="400" height="150"/><text x="50%" y="50%" font-family="Arial" font-size="14" fill="%232A7B9B" text-anchor="middle" dy=".3em">No Trip Image</text></svg>'; ?>
+                            <img src="<?= $imagePath ?>" style="width:100%; height:150px; object-fit:cover; border-radius:8px; margin-bottom:15px;" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22150%22><rect fill=%22%23E8F4F8%22 width=%22400%22 height=%22150%22/><text x=%2250%25%22 y=%2250%25%22 font-family=Arial font-size=14 fill=%222A7B9B%22 text-anchor=middle dy=.3em>Image Not Found</text></svg>'">
+                            <div class="trip-header">
+                                <div>
+                                    <h5 class="trip-title"><?= htmlspecialchars($trip['trip_name']) ?></h5>
+                                    <p class="trip-destination"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($trip['destination']) ?></p>
                                 </div>
-                                <div class="trip-details">
-                                    <div class="detail-item">
-                                        <span class="detail-icon"><i class="fas fa-calendar-alt"></i></span>
-                                        <span><?php echo date('M d', strtotime($trip['start_date'])); ?></span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <span class="detail-icon"><i class="fas fa-dollar-sign"></i></span>
-                                        <span>Rs.<?php echo number_format($trip['budget_min'] ?? 0); ?></span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <span class="detail-icon"><i class="fas fa-users"></i></span>
-                                        <span><?php echo $trip['group_size_min'] ?? 0; ?> people</span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <span class="detail-icon"><i class="fas fa-car"></i></span>
-                                        <span><?php echo htmlspecialchars($trip['travel_mode'] ?? 'Not specified'); ?></span>
-                                    </div>
-                                </div>
-                                <!--<p class="trip-description">
-                                    <?php /*echo substr(htmlspecialchars($trip['description'] ?? ''), 0, 100) . '...'; */ ?>
-                                </p>-->
-
-                                <?php if ($trip['host_id'] == $user_id): ?>
-                                    <div class="applicants-section">
-                                        <p class="applicants-label">Applied by:</p>
-                                        <?php
-                                        $applicants_query = "SELECT u.id, u.name FROM trip_applications ta 
-                                                        JOIN users u ON ta.user_id = u.id 
-                                                        WHERE ta.trip_id = ? AND ta.status = 'accepted' LIMIT 5";
-                                        $applicants_stmt = $conn->prepare($applicants_query);
-                                        $applicants_stmt->bind_param("i", $trip_id);
-                                        $applicants_stmt->execute();
-                                        $applicants_result = $applicants_stmt->get_result();
-
-                                        if ($applicants_result->num_rows > 0) {
-                                            echo '<div class="applicants-list">';
-                                            while ($applicant = $applicants_result->fetch_assoc()) {
-                                                echo '<span class="applicant-badge">' . htmlspecialchars($applicant['name']) . '</span>';
-                                            }
-                                            if ($applicants_result->num_rows >= 5 && ($trip['accepted_count'] ?? 0) > 5) {
-                                                echo '<span class="applicant-more">+' . (($trip['accepted_count'] ?? 0) - 5) . ' more</span>';
-                                            }
-                                            echo '</div>';
-                                        } else {
-                                            echo '<p style="font-size: 12px; color: #999; margin: 0;">No applicants yet</p>';
-                                        }
-                                        ?>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="trip-footer">
-                                    <span class="group-progress">
-                                        <?php echo ($trip['accepted_count'] ?? 0) . '/' . ($trip['group_size_min'] ?? 0); ?> joined
-                                    </span>
-
-                                    <div class="footer-actions">
-                                        <a href="viewTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-view" title="View trip details">
-                                            <i class="fas fa-eye"></i> View
-                                        </a>
-
-                                        <?php if ($isPast): ?>
-                                            <button class="btn-apply" disabled title="Trip date has passed">
-                                                <i class="fas fa-times"></i> Trip Ended
-                                            </button>
-                                        <?php elseif ($isFull): ?>
-                                            <button class="btn-apply" disabled title="This trip is full">
-                                                <i class="fas fa-ban"></i> Trip Full
-                                            </button>
-                                        <?php elseif ($hasApplied): ?>
-                                            <button class="btn-apply" disabled title="You have already applied">
-                                                <i class="fas fa-check"></i> Applied
-                                            </button>
-                                        <?php else: ?>
-                                            <a href="applyTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-apply" title="Apply for this trip">
-                                                <i class="fas fa-check"></i> Apply
-                                            </a>
-                                        <?php endif; ?>
-                                    </div>
+                                <span class="trip-score"><?= $score ?>%</span>
+                            </div>
+                            <div class="trip-details">
+                                <div class="detail-item"><span class="detail-icon"><i class="fas fa-calendar-alt"></i></span><span><?= date('M d', strtotime($trip['start_date'])) ?></span></div>
+                                <div class="detail-item"><span class="detail-icon"><i class="fas fa-dollar-sign"></i></span><span>Rs.<?= number_format($trip['budget_min'] ?? 0) ?></span></div>
+                                <div class="detail-item"><span class="detail-icon"><i class="fas fa-users"></i></span><span><?= $trip['group_size_min'] ?? 0 ?> people</span></div>
+                                <div class="detail-item"><span class="detail-icon"><i class="fas fa-car"></i></span><span><?= htmlspecialchars($trip['travel_mode'] ?? 'Not specified') ?></span></div>
+                            </div>
+                            <div class="trip-footer">
+                                <span class="group-progress"><?= ($trip['accepted_count'] ?? 0) ?>/<?= $trip['group_size_min'] ?? 0 ?> joined</span>
+                                <div class="footer-actions">
+                                    <a href="viewTrip.php?trip_id=<?= $trip['id'] ?>" class="btn-view"><i class="fas fa-eye"></i> View</a>
+                                    <?php if ($isPast): ?>
+                                        <button class="btn-apply" disabled title="Trip date has passed"><i class="fas fa-times"></i> Trip Ended</button>
+                                    <?php elseif ($isFull): ?>
+                                        <button class="btn-apply" disabled title="This trip is full"><i class="fas fa-ban"></i> Trip Full</button>
+                                    <?php elseif ($hasApplied): ?>
+                                        <button class="btn-apply" disabled title="You have already applied"><i class="fas fa-check"></i> Applied</button>
+                                    <?php elseif ($hasConflict): ?>
+                                        <button class="btn-apply" disabled title="You are already accepted in another overlapping trip"><i class="fas fa-exclamation-circle"></i> Apply</button>
+                                    <?php else: ?>
+                                        <a href="applyTrip.php?trip_id=<?= $trip['id'] ?>" class="btn-apply"><i class="fas fa-check"></i> Apply</a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

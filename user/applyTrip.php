@@ -34,9 +34,28 @@ if ($check_stmt->get_result()->num_rows > 0) {
     exit;
 }
 
+$overlapStmt = $conn->prepare("
+    SELECT 1
+    FROM trip_applications ta
+    JOIN trips t ON t.id = ta.trip_id
+    WHERE ta.user_id = ?
+      AND ta.status = 'Accepted'
+      AND NOT (t.end_date < ? OR t.start_date > ?)
+    LIMIT 1
+");
+$overlapStmt->bind_param("iss", $user_id, $trip['start_date'], $trip['end_date']);
+$overlapStmt->execute();
+$overlapBlocked = $overlapStmt->get_result()->num_rows > 0;
+
 $score = calculateTripCompatibility($user, $trip);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if ($overlapBlocked) {
+        $_SESSION['error'] = "You cannot apply for this trip due to date conflict with an accepted trip.";
+        header("Location: applyTrip.php?trip_id=$trip_id");
+        exit;
+    }
+
     $apply_stmt = $conn->prepare("INSERT INTO trip_applications(trip_id, user_id, compatibility_score, status) VALUES(?, ?, ?, 'pending')");
     $apply_stmt->bind_param("iii", $trip_id, $user_id, $score);
     if ($apply_stmt->execute()) {
@@ -45,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -301,11 +321,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
 
             <form method="post">
-                <div class="action-buttons">
+            <div class="action-buttons">
+                <?php if ($overlapBlocked): ?>
+                    <button type="button" class="btn-apply" disabled title="You have an overlapping accepted trip">
+                        <i class="fas fa-ban"></i> Cannot Apply
+                    </button>
+                <?php else: ?>
                     <button type="submit" class="btn-apply"><i class="fas fa-check-circle"></i> Confirm & Apply</button>
-                    <a href="discoverTrips.php" class="btn-cancel"><i class="fas fa-times-circle"></i> Cancel</a>
-                </div>
+                <?php endif; ?>
+                <a href="discoverTrips.php" class="btn-cancel"><i class="fas fa-times-circle"></i> Cancel</a>
+            </div>
             </form>
+
         </div>
     </div>
     </div>
