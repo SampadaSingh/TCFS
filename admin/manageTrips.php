@@ -62,7 +62,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['ajax'])) {
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 $search_query = $search ? "WHERE t.trip_name LIKE '%$search%' OR t.destination LIKE '%$search%'" : "";
 
-$trips = $conn->query("SELECT t.id, t.trip_name as trip_name, t.destination, t.start_date, t.end_date, t.budget_min, t.budget_max, t.status, u.name as host_name FROM trips t JOIN users u ON t.host_id = u.id $search_query ORDER BY t.created_at DESC");
+$trips = $conn->query("
+    SELECT 
+        t.id,
+        t.trip_name,
+        t.destination,
+        t.start_date,
+        t.end_date,
+        t.budget_min,
+        t.budget_max,
+        t.status,
+        t.group_size_max,
+        u.name as host_name,
+        (SELECT COUNT(*) FROM trip_applications ta WHERE ta.trip_id = t.id AND ta.status = 'accepted') AS accepted_count
+    FROM trips t
+    JOIN users u ON t.host_id = u.id
+    $search_query
+    ORDER BY t.created_at DESC
+");
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -101,6 +119,7 @@ $trips = $conn->query("SELECT t.id, t.trip_name as trip_name, t.destination, t.s
                                     <th>Trip Name</th>
                                     <th>Destination</th>
                                     <th>Host</th>
+                                    <th>Count</th>
                                     <th>Dates</th>
                                     <th>Budget</th>
                                     <th>Status</th>
@@ -114,6 +133,7 @@ $trips = $conn->query("SELECT t.id, t.trip_name as trip_name, t.destination, t.s
                                     <td><?php echo htmlspecialchars($trip['trip_name']); ?></td>
                                     <td><?php echo htmlspecialchars($trip['destination']); ?></td>
                                     <td><?php echo htmlspecialchars($trip['host_name']); ?></td>
+                                    <td><?php echo $trip['accepted_count'] . '/' . $trip['group_size_max']; ?></td>
                                     <td><?php echo date('M d', strtotime($trip['start_date'])) . ' - ' . date('M d, Y', strtotime($trip['end_date'])); ?></td>
                                     <td>Rs.<?php echo number_format($trip['budget_min']); ?> - Rs.<?php echo number_format($trip['budget_max']); ?></td>
                                     <td><span class="status-badge status-<?php echo $trip['status']; ?>"><?php echo ucfirst($trip['status']); ?></span></td>
