@@ -45,10 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_place = trim($_POST['end_place'] ?? '');
     $start_date = $_POST['start_date'] ?? '';
     $end_date = $_POST['end_date'] ?? '';
-    $travel_mode = isset($_POST['travel_mode']) ? $_POST['travel_mode'] : 'Mixed';
+    $travel_mode = $_POST['travel_mode'] ?? 'Mixed';
     $trip_style = $_POST['trip_style'] ?? 'Adventure';
     $description = trim($_POST['description'] ?? '');
-    $trip_image = null; // Initialize trip_image
+    $trip_image = $trip['trip_image'] ?? null;
     $age_min = isset($_POST['age_min']) ? (int)$_POST['age_min'] : 0;
     $age_max = isset($_POST['age_max']) ? (int)$_POST['age_max'] : 0;
     $preferred_gender = $_POST['preferred_gender'] ?? 'Any';
@@ -57,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $group_size_max = isset($_POST['group_size_max']) ? (int)$_POST['group_size_max'] : null;
     $collaborator_id = !empty($_POST['collaborator_id']) ? intval($_POST['collaborator_id']) : NULL;
     $previous_collaborator = $trip['collaborator_id'];
-    $collab_var = $collaborator_id ?? null;
 
     $startdate = strtotime($start_date);
     $enddate = strtotime($end_date);
@@ -76,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Maximum group size must be greater than or equal to minimum group size.";
     }
 
+    // overlapping trips
     if (!$error) {
         $duration_days = (int)(($enddate - $startdate) / 86400) + 1;
         $budget_min = 0;
@@ -86,35 +86,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $budget_max = isset($budget_matches[0][1]) ? intval($budget_matches[0][1]) : $budget_min;
         }
 
-        /*$group_size_label = $group_size_min;
-        if ($group_size_max !== null) {
-            $group_size_label .= '-' . $group_size_max;
-        } else {
-            $group_size_label .= '+';
-        }*/
-        $trip_image = $trip['trip_image']; // old value
+        $overlap_stmt = $conn->prepare("
+            SELECT id, trip_name, start_date, end_date
+            FROM trips
+            WHERE host_id = ? AND id != ? AND (
+                (start_date <= ? AND end_date >= ?) OR
+                (start_date <= ? AND end_date >= ?) OR
+                (start_date >= ? AND end_date <= ?)
+            )
+            LIMIT 1
+        ");
+        $overlap_stmt->bind_param(
+            "iissssss",
+            $user_id,
+            $trip_id,
+            $start_date,
+            $start_date,
+            $end_date,
+            $end_date,
+            $start_date,
+            $end_date
+        );
+        $overlap_stmt->execute();
+        $overlap_result = $overlap_stmt->get_result();
+        if ($overlap_result->num_rows > 0) {
+            $existing_trip = $overlap_result->fetch_assoc();
+            $error = "The dates overlap with your other trip: '" . htmlspecialchars($existing_trip['trip_name']) .
+                     "' (" . $existing_trip['start_date'] . " to " . $existing_trip['end_date'] . ").";
+        }
+        $overlap_stmt->close();
+    }
 
-        if (isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['trip_image']['tmp_name'];
-            $fileName = basename($_FILES['trip_image']['name']);
-            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
-            $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    if (!$error && isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['trip_image']['tmp_name'];
+        $fileName = basename($_FILES['trip_image']['name']);
+        $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-            if (in_array($fileExt, $allowedExts)) {
-                $newFileName = uniqid('trip_', true) . '.' . $fileExt;
-                $destPath = '../assets/img/' . $newFileName;
-
-                if (move_uploaded_file($fileTmpPath, $destPath)) {
-                    $trip_image = $newFileName; // <-- update the variable for DB
-                }
+        if (in_array($fileExt, $allowedExts)) {
+            $newFileName = uniqid('trip_', true) . '.' . $fileExt;
+            $destPath = '../assets/img/' . $newFileName;
+            if (move_uploaded_file($fileTmpPath, $destPath)) {
+                $trip_image = $newFileName;
             }
         }
+    }
 
-        // Update DB with new filename
-        $stmt = $conn->prepare("UPDATE trips SET trip_image = ? WHERE id = ?");
-        $stmt->bind_param("si", $trip_image, $trip_id);
-        $stmt->execute();
-        $stmt->close();
+    if (!$error) {
         $update_stmt = $conn->prepare("
             UPDATE trips SET
                 trip_name = ?,
@@ -161,64 +179,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $age_max,
             $trip_style,
             $description,
-            $collab_var,
+            $collaborator_id,
             $trip_image,
             $trip_id,
             $user_id
         );
 
-
         if ($update_stmt->execute()) {
             $update_stmt->close();
-
-            if ($collaborator_id && $collaborator_id != $previous_collaborator) {
-                $check_req = $conn->prepare("SELECT id, status FROM collaborator_requests WHERE trip_id = ? AND collaborator_id = ?");
-                $check_req->bind_param("ii", $trip_id, $collaborator_id);
-                $check_req->execute();
-                $existing = $check_req->get_result()->fetch_assoc();
-                $check_req->close();
-
-                if (!$existing) {
-                    $req_stmt = $conn->prepare("INSERT INTO collaborator_requests (trip_id, host_id, collaborator_id, status) VALUES (?, ?, ?, 'pending')");
-                    $req_stmt->bind_param("iii", $trip_id, $user_id, $collaborator_id);
-                    $req_stmt->execute();
-                    $req_stmt->close();
-                    $success = "Collaborator request sent successfully!";
-                } elseif ($existing['status'] == 'rejected') {
-                    $update_req = $conn->prepare("UPDATE collaborator_requests SET status = 'pending', created_at = NOW() WHERE trip_id = ? AND collaborator_id = ?");
-                    $update_req->bind_param("ii", $trip_id, $collaborator_id);
-                    $update_req->execute();
-                    $update_req->close();
-                    $success = "Collaborator request resent successfully!";
-                }
-            }
-
             header("Location: viewTrip.php?id=$trip_id&success=1");
             exit;
         } else {
             $error = "Failed to update trip: " . $update_stmt->error;
             $update_stmt->close();
         }
-    }
-
-    if ($error) {
-        $trip['trip_name'] = $trip_name;
-        $trip['destination'] = $destination;
-        $trip['start_place'] = $start_place;
-        $trip['end_place'] = $end_place;
-        $trip['start_date'] = $start_date;
-        $trip['end_date'] = $end_date;
-        $trip['travel_mode'] = $travel_mode;
-        $trip['trip_style'] = $trip_style;
-        $trip['description'] = $description;
-        $trip['age_min'] = $age_min;
-        $trip['age_max'] = $age_max;
-        $trip['preferred_gender'] = $preferred_gender;
-        $trip['budget_label'] = $budget_label;
-        $trip['group_size_min'] = $group_size_min;
-        $trip['group_size_max'] = $group_size_max;
-        $trip['collaborator_id'] = $collaborator_id;
-        $trip['trip_image'] = $trip_image;
     }
 }
 ?>
@@ -563,7 +537,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label class="form-label">Trip Image</label><br>
 
                     <?php
-                    // Check if there's a valid image filename stored
                     if (!empty($trip['trip_image']) && $trip['trip_image'] !== '0' && file_exists('../assets/img/' . $trip['trip_image'])): ?>
                         <img
                             src="../assets/img/<?= htmlspecialchars($trip['trip_image']) ?>"

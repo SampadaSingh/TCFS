@@ -371,10 +371,7 @@ usort($trips_array, function ($a, $b) {
                 ?>
                     <div class="col-md-6 col-lg-4">
                         <div class="trip-card">
-                            <!-- Trip Image -->
-                             
                             <?php
-                            // Always try to use the trip_image if it exists, otherwise use placeholder
                             $imagePath = !empty($trip['trip_image']) 
                                 ? '../assets/img/' . htmlspecialchars($trip['trip_image'])
                                 : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="150"%3E%3Crect fill="%23E8F4F8" width="400" height="150"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%232A7B9B" text-anchor="middle" dy=".3em"%3ENo Trip Image%3C/text%3E%3C/svg%3E';

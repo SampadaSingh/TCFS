@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? implode(',', $_POST['trip_style'])
         : $preferences['trip_style'];
 
-    $available_from = !empty($_POST['available_from']) ? $_POST['available_from'] : $preferences['available_from'];
-    $available_to   = !empty($_POST['available_to']) ? $_POST['available_to'] : $preferences['available_to'];
+    $available_from = ($_POST['available_from'] ?? '') !== '' ? $_POST['available_from'] : null;
+    $available_to   = ($_POST['available_to']   ?? '') !== '' ? $_POST['available_to']   : null;
 
     $budget_min = (!empty($_POST['budget_min']) || $_POST['budget_min'] === '0') ? (float)$_POST['budget_min'] : $preferences['budget_min'];
     $budget_max = (!empty($_POST['budget_max']) || $_POST['budget_max'] === '0') ? (float)$_POST['budget_max'] : $preferences['budget_max'];
@@ -72,7 +72,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($message)) {
 
         if (!empty($preferences['id'])) {
-            // UPDATE
             $stmt = $conn->prepare("
                 UPDATE user_preferences 
                 SET preferred_destination = ?, trip_style = ?, available_from = ?, available_to = ?, 
@@ -101,7 +100,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: userDashboard.php");
             exit;
         } else {
-            // INSERT
             $stmt = $conn->prepare("
                 INSERT INTO user_preferences 
                 (user_id, preferred_destination, trip_style, available_from, available_to, budget_min, budget_max, travel_mode, age_min, age_max, preferred_gender, preferences_filled)

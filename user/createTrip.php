@@ -1,4 +1,4 @@
-<?php
+<?php 
 session_start();
 require "../config/db.php";
 
@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $startdate = strtotime($start_date);
     $enddate   = strtotime($end_date);
 
+    // Basic validations
     if (strlen($name) < 3) {
         $error = "Trip name must be at least 3 characters.";
     } elseif (empty($start_place) || empty($end_place)) {
@@ -50,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = "Please select a valid budget range.";
     } else {
         list($budget_min, $budget_max) = array_map('intval', explode('-', $budget_range));
-        //$group_size_label = $group_size_min . '-' . $group_size_max;
 
         $start = new DateTime($start_date);
         $end = new DateTime($end_date);
@@ -61,37 +61,67 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($startdate < $today) {
             $error = "Trip cannot start in the past.";
         }
+    }
 
-        // Handle trip image upload
-        if (isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['trip_image']['tmp_name'];
-            $fileName = basename($_FILES['trip_image']['name']);
-            $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+    // Handle trip image upload
+    if (!$error && isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
+        $fileTmpPath = $_FILES['trip_image']['tmp_name'];
+        $fileName = basename($_FILES['trip_image']['name']);
+        $fileExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
-            $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        $allowedExts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 
-            if (in_array($fileExt, $allowedExts)) {
-                $newFileName = uniqid('trip_', true) . '.' . $fileExt;
-                $destPath = '../assets/img/' . $newFileName;
+        if (in_array($fileExt, $allowedExts)) {
+            $newFileName = uniqid('trip_', true) . '.' . $fileExt;
+            $destPath = '../assets/img/' . $newFileName;
 
-                if (move_uploaded_file($fileTmpPath, $destPath)) {
-                    $trip_image = $newFileName;
-                } else {
-                    $error = "Failed to move uploaded file.";
-                }
+            if (move_uploaded_file($fileTmpPath, $destPath)) {
+                $trip_image = $newFileName;
             } else {
-                $error = "Invalid file type. Allowed: jpg, jpeg, png, gif, webp";
+                $error = "Failed to move uploaded file.";
+            }
+        } else {
+            $error = "Invalid file type. Allowed: jpg, jpeg, png, gif, webp";
+        }
+    }
+
+    // Check for overlapping trips
+    if (!$error) {
+        $stmt_check = $conn->prepare("SELECT trip_name, start_date, end_date FROM trips WHERE host_id = ?");
+        $stmt_check->bind_param("i", $user_id);
+        $stmt_check->execute();
+        $result_check = $stmt_check->get_result();
+
+        $overlap_found = false;
+        $overlapping_trip_name = '';
+
+        while ($existing = $result_check->fetch_assoc()) {
+            $existing_start = strtotime($existing['start_date']);
+            $existing_end   = strtotime($existing['end_date']);
+
+            // Overlap condition
+            if (!($enddate < $existing_start || $startdate > $existing_end)) {
+                $overlap_found = true;
+                $overlapping_trip_name = $existing['trip_name'];
+                break;
             }
         }
+        $stmt_check->close();
 
-        if (!$error) {
-            $stmt = $conn->prepare("
-                INSERT INTO trips(
-                    host_id, trip_name, destination, start_place, end_place, start_date, end_date,
-                    duration_days, travel_mode, budget_label, budget_min, budget_max, group_size_min, group_size_max,
-                    preferred_gender, age_min, age_max, trip_style, description, collaborator_id, trip_image, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-            ");
+        if ($overlap_found) {
+            $error = "Your new trip overlaps with an existing trip: '$overlapping_trip_name'. Please choose different dates.";
+        }
+    }
+
+    // Insert trip if no errors
+    if (!$error) {
+        $stmt = $conn->prepare("
+            INSERT INTO trips(
+                host_id, trip_name, destination, start_place, end_place, start_date, end_date,
+                duration_days, travel_mode, budget_label, budget_min, budget_max, group_size_min, group_size_max,
+                preferred_gender, age_min, age_max, trip_style, description, collaborator_id, trip_image, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+        ");
 
         $stmt->bind_param(
             "issssssissiiisissiis",
@@ -123,7 +153,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             exit;
         } else {
             $error = "Error creating trip: " . $stmt->error;
-        }
         }
     }
 }
@@ -344,11 +373,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <div>
                         <label class="form-label">Minimum Age</label>
-                        <input type="number" name="age_min" class="form-control" min="18" max="80" required value="<?= htmlspecialchars($_POST['age_min'] ?? 18) ?>">
+                        <input type="number" name="age_min" class="form-control" min="18" max="65" required value="<?= htmlspecialchars($_POST['age_min'] ?? 18) ?>">
                     </div>
                     <div>
                         <label class="form-label">Maximum Age</label>
-                        <input type="number" name="age_max" class="form-control" min="18" max="80" required value="<?= htmlspecialchars($_POST['age_max'] ?? 80) ?>">
+                        <input type="number" name="age_max" class="form-control" min="18" max="65" required value="<?= htmlspecialchars($_POST['age_max'] ?? 65) ?>">
                     </div>
                 </div>
             </div>

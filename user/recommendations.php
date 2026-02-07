@@ -308,6 +308,16 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                         $score = isset($trip['compatibility_score']) ? round($trip['compatibility_score']) : 0;
                     ?>
                         <div class="recommendation-card">
+                            <?php
+                            $imagePath = !empty($trip['trip_image']) 
+                                ? '../assets/img/' . htmlspecialchars($trip['trip_image'])
+                                : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="150"%3E%3Crect fill="%23E8F4F8" width="400" height="150"/%3E%3Ctext x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%232A7B9B" text-anchor="middle" dy=".3em"%3ENo Trip Image%3C/text%3E%3C/svg%3E';
+                            ?>
+                            <img
+                                src="<?= $imagePath ?>"
+                                alt="Trip Image"
+                                style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 15px;"
+                                onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22150%22%3E%3Crect fill=%22%23E8F4F8%22 width=%22400%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 font-family=%22Arial%22 font-size=%2214%22 fill=%22%232A7B9B%22 text-anchor=%22middle%22 dy=%22.3em%22%3EImage Not Found%3C/text%3E%3C/svg%3E'">
                             <span class="match-badge"><?php echo $score; ?>% Match</span>
                             <h3 class="card-title"><?php echo htmlspecialchars($trip['trip_name']); ?></h3>
                             <div class="card-meta">
@@ -325,7 +335,7 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                                 </div>
                             </div>
                             <div class="card-action">
-                                <a href="viewTrip.php?id=<?php echo $trip['id']; ?>" class="btn-view">
+                                <a href="viewTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-view">
                                     <i class="bi bi-eye"></i> View Details
                                 </a>
                                 <a href="applyTrip.php?trip_id=<?php echo $trip['id']; ?>" class="btn-apply">
@@ -352,7 +362,11 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                     <?php foreach ($recommendedCompanions as $companion): ?>
                         <div class="recommendation-card companion-card">
                             <div class="companion-avatar">
-                                <?php echo strtoupper(substr($companion['name'], 0, 1)); ?>
+                                <?php
+                                list($first, $last) = explode(' ', $companion['name'], 2);
+                                echo strtoupper($first[0] . $last[0]);
+                                ?>
+
                             </div>
                             <div class="companion-info">
                                 <span class="match-badge"><?php echo round($companion['compatibility_score']); ?>% Match</span>
