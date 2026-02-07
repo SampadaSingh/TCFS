@@ -1,4 +1,4 @@
-<?php 
+<?php
 session_start();
 require "../config/db.php";
 
@@ -32,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $startdate = strtotime($start_date);
     $enddate   = strtotime($end_date);
 
-    // Basic validations
     if (strlen($name) < 3) {
         $error = "Trip name must be at least 3 characters.";
     } elseif (empty($start_place) || empty($end_place)) {
@@ -63,7 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Handle trip image upload
     if (!$error && isset($_FILES['trip_image']) && $_FILES['trip_image']['error'] === UPLOAD_ERR_OK) {
         $fileTmpPath = $_FILES['trip_image']['tmp_name'];
         $fileName = basename($_FILES['trip_image']['name']);
@@ -113,7 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
     }
 
-    // Insert trip if no errors
     if (!$error) {
         $stmt = $conn->prepare("
             INSERT INTO trips(
@@ -124,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ");
 
         $stmt->bind_param(
-            "issssssissiiisissiis",
+            "issssssissiiiississsi",
             $user_id,
             $name,
             $destination,
@@ -288,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Image</label>
-                    <input type="file" name="trip_image" class="form-control">  
+                    <input type="file" name="trip_image" class="form-control">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Collaborator / Volunteer (Optional)</label>

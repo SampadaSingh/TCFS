@@ -45,13 +45,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? implode(',', $_POST['trip_style'])
         : $preferences['trip_style'];
 
-    $available_from = ($_POST['available_from'] ?? '') !== '' ? $_POST['available_from'] : null;
-    $available_to   = ($_POST['available_to']   ?? '') !== '' ? $_POST['available_to']   : null;
+    $available_from = isset($_POST['available_from']) && $_POST['available_from'] !== '' ? $_POST['available_from'] : $preferences['available_from'];
+
+    $available_to = isset($_POST['available_to']) && $_POST['available_to'] !== '' ? $_POST['available_to'] : $preferences['available_to'];
 
     $budget_min = (!empty($_POST['budget_min']) || $_POST['budget_min'] === '0') ? (float)$_POST['budget_min'] : $preferences['budget_min'];
     $budget_max = (!empty($_POST['budget_max']) || $_POST['budget_max'] === '0') ? (float)$_POST['budget_max'] : $preferences['budget_max'];
 
-    $travel_mode = !empty($_POST['travel_mode']) ? $_POST['travel_mode'] : $preferences['travel_mode'];
+    $travel_mode = isset($_POST['travel_mode']) && $_POST['travel_mode'] !== '' ? $_POST['travel_mode'] : $preferences['travel_mode'];
 
     $age_min = (!empty($_POST['age_min']) || $_POST['age_min'] === '0') ? (int)$_POST['age_min'] : $preferences['age_min'];
     $age_max = (!empty($_POST['age_max']) || $_POST['age_max'] === '0') ? (int)$_POST['age_max'] : $preferences['age_max'];
