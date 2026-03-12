@@ -1,171 +1,61 @@
 <?php
-
 function calculateDateOverlap($start1, $end1, $start2, $end2) {
-    $start1 = new DateTime($start1);
-    $end1 = new DateTime($end1);
-    $start2 = new DateTime($start2);
-    $end2 = new DateTime($end2);
-    
-    $overlapStart = max($start1, $start2);
-    $overlapEnd = min($end1, $end2);
-    
-    if ($overlapStart > $overlapEnd) {
-        return 0;
-    }
-    
-    $interval = $overlapStart->diff($overlapEnd);
-    return $interval->days + 1;
+    // ensure all are DateTime objects
+    if (!($start1 instanceof DateTime)) $start1 = new DateTime($start1);
+    if (!($end1 instanceof DateTime)) $end1 = new DateTime($end1);
+    if (!($start2 instanceof DateTime)) $start2 = new DateTime($start2);
+    if (!($end2 instanceof DateTime)) $end2 = new DateTime($end2);
+
+    $overlapStart = $start1 > $start2 ? $start1 : $start2;
+    $overlapEnd   = $end1 < $end2 ? $end1 : $end2;
+
+    if ($overlapStart > $overlapEnd) return 0;
+
+    return $overlapStart->diff($overlapEnd)->days + 1;
 }
 
-function calculateInterestScore($interests1, $interests2) {
-    if (empty($interests1) || empty($interests2)) {
-        return 0;
-    }
-    
-    $common = count(array_intersect($interests1, $interests2));
-    $total = count(array_unique(array_merge($interests1, $interests2)));
-    
-    if ($total == 0) {
-        return 0;
-    }
-    
-    return ($common / $total) * 100;
+function calculateInterestScore($userInterests, $hostInterests) {
+    if (empty($userInterests) || empty($hostInterests)) return 50;
+    $u = array_map('strtolower', $userInterests);
+    $h = array_map('strtolower', $hostInterests);
+    $common = count(array_intersect($u, $h));
+    $total  = count(array_unique(array_merge($u, $h)));
+    return $total > 0 ? ($common / $total) * 100 : 50;
 }
 
-function calculateDestinationScore($dest1, $dest2) {
-    $dest1 = strtolower(trim($dest1));
-    $dest2 = strtolower(trim($dest2));
-
-    if (empty($dest1) || empty($dest2)) {
-        return 0;
-    }
-
-    if ($dest1 === $dest2) {
-        return 100;
-    }
-
-    similar_text($dest1, $dest2, $percent);
-
-    if ($percent >= 70) {
-        return 60; 
-    }
-
-    if ($percent >= 40) {
-        return 30; 
-    }
-
+function calculateDestinationScore($userDest, $tripDest) {
+    $u = strtolower(trim($userDest));
+    $t = strtolower(trim($tripDest));
+    if (empty($u) || empty($t)) return 50;
+    if ($u === $t) return 100;
+    similar_text($u, $t, $percent);
+    if ($percent >= 70) return 60;
+    if ($percent >= 40) return 30;
     return 0;
 }
 
-function calculateModeScore($mode1, $mode2) {
-    $mode1 = strtolower(trim($mode1));
-    $mode2 = strtolower(trim($mode2));
-    
-    if (empty($mode1) || empty($mode2)) {
-        return 50;
-    }
-    
-    if ($mode1 === $mode2) {
-        return 100;
-    }
-    
-    return 0;
+function calculateModeScore($userMode, $tripMode) {
+    $u = strtolower(trim($userMode));
+    $t = strtolower(trim($tripMode));
+    if (empty($u) || $t === 'mixed') return 100;
+    return $u === $t ? 100 : 70;
 }
 
-function weightedMatchScore($trip1, $trip2, $interests1, $interests2) {
-    $compatibilityThreshold = 60; // Minimum score for trip recommendations
-
-    $dateWeight = 0.35;
-    $destinationWeight = 0.30;
-    $interestWeight = 0.25;
-    $modeWeight = 0.10;
-    
-    $trip1Duration = (new DateTime($trip1['start_date']))->diff(new DateTime($trip1['end_date']))->days + 1;
-    $trip2Duration = (new DateTime($trip2['start_date']))->diff(new DateTime($trip2['end_date']))->days + 1;
-    $maxDuration = max($trip1Duration, $trip2Duration);
-    
-    $overlapDays = calculateDateOverlap(
-        $trip1['start_date'], 
-        $trip1['end_date'],
-        $trip2['start_date'], 
-        $trip2['end_date']
-    );
-    
-    $dateScore = $maxDuration > 0 ? ($overlapDays / $maxDuration) * 100 : 0;
-    
-    $destinationScore = calculateDestinationScore(
-        $trip1['destination'],
-        $trip2['destination']
-    );
-    
-    $interestScore = calculateInterestScore($interests1, $interests2);
-    
-    $modeScore = calculateModeScore(
-        $trip1['travel_mode'] ?? '',
-        $trip2['travel_mode'] ?? ''
-    );
-    
-    $finalScore = (
-        $dateScore * $dateWeight +
-        $destinationScore * $destinationWeight +
-        $interestScore * $interestWeight +
-        $modeScore * $modeWeight
-    );
-    
-    if ($finalScore > $compatibilityThreshold) {
-        return round($finalScore, 2);
-    }
-    return 0; 
-
+function calculateAge($dob) {
+    if (empty($dob)) return 0;
+    return (new DateTime())->diff(new DateTime($dob))->y;
 }
 
-function getUserTrips($conn, $userId) {
-    $stmt = $conn->prepare("
-        SELECT t.* FROM trips t
-        WHERE t.host_id = ? 
-        OR t.id IN (
-            SELECT trip_id FROM trip_applications 
-            WHERE user_id = ? AND status = 'accepted'
-        )
-        ORDER BY t.start_date DESC
-    ");
-    $stmt->bind_param("ii", $userId, $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $trips = [];
-    while ($row = $result->fetch_assoc()) {
-        $trips[] = $row;
-    }
-    return $trips;
-}
-
-function getAllActiveTrips($conn, $excludeUserId = null) {
-    $query = "
-        SELECT t.*, u.name as host_name, u.email as host_email 
-        FROM trips t
-        JOIN users u ON t.host_id = u.id
-        WHERE t.status IN ('pending', 'confirmed') 
-        AND t.start_date >= CURDATE()
-    ";
-    
-    if ($excludeUserId) {
-        $query .= " AND t.host_id != $excludeUserId";
-    }
-    
-    $query .= " ORDER BY t.start_date ASC";
-    
-    $result = $conn->query($query);
-    $trips = [];
-    while ($row = $result->fetch_assoc()) {
-        $trips[] = $row;
-    }
-    return $trips;
+function calculateAgeScore($userAge, $trip) {
+    $ageMin = $trip['age_min'] ?? 0;
+    $ageMax = $trip['age_max'] ?? 99;
+    if (($trip['preferred_age'] ?? 'Any') === 'Any') return 100;
+    return ($userAge >= $ageMin && $userAge <= $ageMax) ? 100 : 70;
 }
 
 function getUserInterests($conn, $userId) {
     $stmt = $conn->prepare("
-        SELECT i.interest_name 
+        SELECT i.interest_name
         FROM user_interests ui
         JOIN interests i ON ui.interest_id = i.id
         WHERE ui.user_id = ?
@@ -173,27 +63,60 @@ function getUserInterests($conn, $userId) {
     $stmt->bind_param("i", $userId);
     $stmt->execute();
     $result = $stmt->get_result();
-    
     $interests = [];
-    while ($row = $result->fetch_assoc()) {
-        $interests[] = $row['interest_name'];
-    }
+    while ($row = $result->fetch_assoc()) $interests[] = $row['interest_name'];
     return $interests;
 }
 
-function getUserActiveTrip($conn, $userId) {
+function isTripEligible($user, $trip, $conn) {
+    if (!empty($trip['preferred_gender']) && strtolower($trip['preferred_gender']) !== 'any' &&
+        strtolower($trip['preferred_gender']) !== strtolower($user['gender'])) return false;
+
+    if (!empty($trip['group_size_max']) && ($trip['accepted_count'] ?? 0) >= $trip['group_size_max']) return false;
+
     $stmt = $conn->prepare("
-        SELECT t.* FROM trips t
-        WHERE t.host_id = ? 
-        AND t.status IN ('pending', 'confirmed')
-        AND t.start_date >= CURDATE()
-        ORDER BY t.start_date ASC
+        SELECT 1 FROM trip_applications 
+        WHERE user_id = ? AND trip_id = ? AND status IN ('accepted','pending')
         LIMIT 1
     ");
-    $stmt->bind_param("i", $userId);
+    $stmt->bind_param("ii", $user['id'], $trip['id']);
     $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_assoc();
+    if ($stmt->get_result()->num_rows > 0) return false;
+
+    if (strtotime($trip['end_date']) < strtotime(date('Y-m-d'))) return false;
+
+    return true;
 }
 
+function calculateUserTripCompatibility($user, $trip, $userInterests, $hostInterests) {
+    $weights = [
+        'date' => 0.40,
+        'destination' => 0.25,
+        'mode' => 0.10,
+        'host_interest' => 0.15,
+        'age' => 0.10
+    ];
+
+    $userStart = !empty($user['available_from']) ? new DateTime($user['available_from']) : new DateTime($trip['start_date']);
+    $userEnd   = !empty($user['available_to']) ? new DateTime($user['available_to']) : new DateTime($trip['end_date']);
+    $tripStart = new DateTime($trip['start_date']);
+    $tripEnd   = new DateTime($trip['end_date']);
+
+    $tripDuration = $tripStart->diff($tripEnd)->days + 1;
+    $overlapDays  = calculateDateOverlap($userStart, $userEnd, $tripStart, $tripEnd);
+    $dateScore    = $tripDuration > 0 ? ($overlapDays / $tripDuration) * 100 : 0;
+
+    $destinationScore = calculateDestinationScore($user['preferred_destination'] ?? '', $trip['destination'] ?? '');
+    $modeScore        = calculateModeScore($user['travel_mode'] ?? '', $trip['travel_mode'] ?? '');
+    $interestScore    = calculateInterestScore($userInterests, $hostInterests);
+    $ageScore         = calculateAgeScore(calculateAge($user['dob']), $trip);
+
+    $finalScore = ($dateScore * $weights['date']) +
+                  ($destinationScore * $weights['destination']) +
+                  ($modeScore * $weights['mode']) +
+                  ($interestScore * $weights['host_interest']) +
+                  ($ageScore * $weights['age']);
+
+    return round($finalScore, 2);
+}
 ?>

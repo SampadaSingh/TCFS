@@ -189,6 +189,14 @@ $collab_stmt->close();
                         <div class="info-label">Trip Style</div>
                         <div class="info-value"><?= htmlspecialchars($trip['trip_style']) ?></div>
                     </div>
+                    <div class="info-item">
+                        <div class="info-label">Preferred Gender</div>
+                        <div class="info-value"><?= htmlspecialchars($trip['preferred_gender']) ?></div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Group Size</div>
+                        <div class="info-value"><?= htmlspecialchars($trip['group_size_min']) ?> - <?= htmlspecialchars($trip['group_size_max']) ?></div>
+                        </div>
                 </div>
             </div>
 

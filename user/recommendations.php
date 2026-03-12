@@ -13,9 +13,9 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $user = $conn->query("SELECT * FROM users WHERE id = $user_id")->fetch_assoc();
 
-$recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 8, 40);
+$recommendedTrips = getPersonalizedTripRecommendations($conn, $user_id, '', 6, 60);
 $recommendedCompanions = getCompanionRecommendations($conn, $user_id, 6, 50);
-$recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
+$recommendedPlaces = recommendPlacesForUser($conn, $user_id, 6);
 
 
 ?>
@@ -331,7 +331,7 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 8);
                                 </div>
                                 <div class="meta-item">
                                     <i class="bi bi-person"></i>
-                                    <span><?php echo htmlspecialchars($trip['host_name']); ?></span>
+                                    <span class="group-progress"><?= ($trip['accepted_count'] ?? 0) ?>/<?= $trip['group_size_min'] ?? 0 ?> joined</span>
                                 </div>
                             </div>
                             <div class="card-action">

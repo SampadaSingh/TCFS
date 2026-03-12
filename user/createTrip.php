@@ -269,6 +269,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <label class="form-label">Trip Name</label>
                     <input type="text" name="name" class="form-control" placeholder="e.g., Trek to ABC" required value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Destination</label>
+                    <input type="text" name="destination" class="form-control" placeholder="e.g., Annapurna Base Camp" required value="<?= htmlspecialchars($_POST['destination'] ?? '') ?>">
+                </div>
                 <div class="grid-cols-2">
                     <div>
                         <label class="form-label">Start Place</label>

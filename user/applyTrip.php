@@ -3,6 +3,7 @@ session_start();
 require "../config/db.php";
 require "../algorithms/weightedMatch.php";
 
+
 if (!isset($_SESSION['user_id']) || !isset($_GET['trip_id'])) {
     header('Location: discoverTrips.php');
     exit;
@@ -279,46 +280,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <p style="color: #666; line-height: 1.6; margin-top: 20px;"><?php echo nl2br(htmlspecialchars($trip['description'])); ?></p>
             </div>
 
-            <div class="score-section">
-                <div class="score-label">YOUR COMPATIBILITY SCORE</div>
-                <div class="score-value"><?php echo $score; ?>%</div>
-                <div class="score-text">
-                    <?php 
-                    if ($score >= 80) echo "Excellent match! You're a great fit for this trip.";
-                    elseif ($score >= 60) echo "Good match. You share many interests with this trip.";
-                    elseif ($score >= 40) echo "Fair match. Some interests align with this trip.";
-                    else echo "Low match. But you can still apply and meet new people!";
-                    ?>
-                </div>
-            </div>
-
-            <h5 class="mb-3">How Your Profile Matches</h5>
-            <div class="score-breakdown">
-                <div class="score-item">
-                    <div class="score-item-label">Date Availability</div>
-                    <div class="score-item-bar">
-                        <div class="score-item-fill" style="width: <?php echo min(100, calculateDateOverlapScore($user['available_from'], $user['available_to'], $trip['start_date'], $trip['end_date'])); ?>%"></div>
-                    </div>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-label">Trip Style Match</div>
-                    <div class="score-item-bar">
-                        <div class="score-item-fill" style="width: <?php echo min(100, calculateTripStyleScore($user['interests'] ?? '', $trip['trip_style'] ?? '')); ?>%"></div>
-                    </div>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-label">Budget Range</div>
-                    <div class="score-item-bar">
-                        <div class="score-item-fill" style="width: <?php echo min(100, calculateBudgetOverlapScore($user['budget'] ?? 0, $trip['budget_min'] ?? 0, $trip['budget_max'] ?? 0)); ?>%"></div>
-                    </div>
-                </div>
-                <div class="score-item">
-                    <div class="score-item-label">Travel Mode</div>
-                    <div class="score-item-bar">
-                        <div class="score-item-fill" style="width: <?php echo min(100, calculateTravelModeScore($user['travel_mode'] ?? '', $trip['travel_mode'] ?? '')); ?>%"></div>
-                    </div>
-                </div>
-            </div>
 
             <form method="post">
             <div class="action-buttons">

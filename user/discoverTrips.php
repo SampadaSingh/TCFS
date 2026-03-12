@@ -329,7 +329,7 @@ while ($row = $accepted_result->fetch_assoc()) {
                                     <h5 class="trip-title"><?= htmlspecialchars($trip['trip_name']) ?></h5>
                                     <p class="trip-destination"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($trip['destination']) ?></p>
                                 </div>
-                                <span class="trip-score"><?= $score ?>%</span>
+                                <!--<span class="trip-score"><?= $score ?>%</span>-->
                             </div>
                             <div class="trip-details">
                                 <div class="detail-item"><span class="detail-icon"><i class="fas fa-calendar-alt"></i></span><span><?= date('M d', strtotime($trip['start_date'])) ?></span></div>
