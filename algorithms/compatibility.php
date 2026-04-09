@@ -1,6 +1,6 @@
 <?php
 function calculateDateOverlap($start1, $end1, $start2, $end2) {
-    // ensure all are DateTime objects
+   
     if (!($start1 instanceof DateTime)) $start1 = new DateTime($start1);
     if (!($end1 instanceof DateTime)) $end1 = new DateTime($end1);
     if (!($start2 instanceof DateTime)) $start2 = new DateTime($start2);

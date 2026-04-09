@@ -155,7 +155,7 @@ function calculateTripCompatibility($user, $trip) {
         'age_gender' => calculateAgeGenderScore($user['age'] ?? 0, $user['gender'] ?? 'Any', $trip['preferred_age'] ?? 'Any', $trip['preferred_gender'] ?? 'Any')
     ];
 
-    $weights = ['date' => 0.25, 'trip_style' => 0.20, 'budget' => 0.20, 'travel_mode' => 0.15, 'destination' => 0.10, 'age_gender' => 0.10];
+    $weights = ['date' => 0.30, 'trip_style' => 0.10, 'budget' => 0.20, 'travel_mode' => 0.05, 'destination' => 0.25, 'age_gender' => 0.10];
 
     $finalScore = 0;
     foreach ($scores as $factor => $score) {
