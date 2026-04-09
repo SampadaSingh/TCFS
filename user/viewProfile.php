@@ -18,7 +18,6 @@ if (!$user_id || $user_id <= 0) {
     die("Invalid or missing user ID.");
 }
 
-//invalid id fixation required////////////////////////////////////////////////////////////
 
 $stmt = $conn->prepare("
     SELECT id, name, email, age, gender, bio, location, created_at 
@@ -34,6 +33,7 @@ if (!$user) {
     die("User not found.");
 }
 
+
 $interests = [];
 $stmt = $conn->prepare("
     SELECT i.interest_name 
@@ -48,6 +48,25 @@ while ($row = $result->fetch_assoc()) {
     $interests[] = $row['interest_name'];
 }
 $stmt->close();
+
+$logged_in_user_id = $_SESSION['user_id'];
+$loggedInUserInterests = [];
+$stmt = $conn->prepare("
+    SELECT i.interest_name 
+    FROM user_interests ui
+    JOIN interests i ON ui.interest_id = i.id
+    WHERE ui.user_id = ?
+");
+$stmt->bind_param("i", $logged_in_user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $loggedInUserInterests[] = $row['interest_name'];
+}
+$stmt->close();
+
+$commonInterests = array_intersect($interests, $loggedInUserInterests);
+
 $conn->close();
 ?>
 
@@ -112,6 +131,42 @@ $conn->close();
         .detail-value {
             color: #333;
         }
+        .interests-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .interest-tag {
+            background: #E8F4F8;
+            color: #2A7B9B;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .common-interest-tag {
+            background: linear-gradient(135deg, #57C785, #2A7B9B);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .common-interests-section {
+            background: #f0f8f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #57C785;
+        }
+        .common-interests-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #57C785;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -128,10 +183,10 @@ $conn->close();
             <div class="detail-value"><?php echo htmlspecialchars($user['name']); ?></div>
         </div>
 
-        <div class="detail-item">
+        <!--<div class="detail-item">
             <div class="detail-label">Email:</div>
             <div class="detail-value"><?php echo htmlspecialchars($user['email']); ?></div>
-        </div>
+        </div>-->
 
         <div class="detail-item">
             <div class="detail-label">Gender:</div>
@@ -141,15 +196,6 @@ $conn->close();
         <div class="detail-item">
             <div class="detail-label">Location:</div>
             <div class="detail-value"><?php echo htmlspecialchars($user['location'] ?? 'N/A'); ?></div>
-        </div>
-
-        <div class="detail-item">
-            <div class="detail-label">Interests:</div>
-            <div class="detail-value">
-                <?php
-                echo !empty($interests) ? implode(', ', array_map('htmlspecialchars', $interests)) : 'None';
-                ?>
-            </div>
         </div>
 
         <div class="detail-item">
@@ -166,6 +212,21 @@ $conn->close();
             <div class="detail-label">Member Since:</div>
             <div class="detail-value"><?php echo date('M d, Y', strtotime($user['created_at'])); ?></div>
         </div>
+
+          <?php if (!empty($commonInterests)): ?>
+        <div class="common-interests-section">
+            <div class="common-interests-title">
+                <i class="bi bi-star-fill"></i> Common Interests (<?php echo count($commonInterests); ?>)
+            </div>
+            <div class="interests-container">
+                <?php foreach ($commonInterests as $interest): ?>
+                    <span class="common-interest-tag">
+                        ✓ <?php echo htmlspecialchars($interest); ?>
+                    </span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

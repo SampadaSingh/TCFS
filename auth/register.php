@@ -22,6 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $error = "Password must contain letter, number, special char and be 8+ chars.";
     } elseif (count($interests) < 3) {
         $error = "Select at least 3 interests.";
+    }elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email format.";
     } else {
         $check = $conn->prepare("SELECT id FROM users WHERE email=?");
         $check->bind_param("s", $email);

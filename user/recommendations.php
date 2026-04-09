@@ -379,7 +379,7 @@ $recommendedPlaces = recommendPlacesForUser($conn, $user_id, 6);
                                     </div>
                                 <?php endif; ?>
                                 <div class="card-action">
-                                    <a href="viewProfile.php?host_id=<?php echo $companion['id']; ?>" class="btn-view">
+                                    <a href="viewProfile.php?user_id=<?php echo $companion['id']; ?>" class="btn-view">
                                         <i class="bi bi-person"></i> View Profile
                                     </a>
                                 </div>

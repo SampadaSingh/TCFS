@@ -69,11 +69,10 @@ function calculateTripStyleScore($userInterests, $tripStyle) {
 }
 
 function calculateTravelModeScore($userMode, $tripMode) {
-    if (empty($userMode) || empty($tripMode)) {
-        return 50;
-    }
-
-    return (strtolower($userMode) === strtolower($tripMode)) ? 100 : 40;
+    $u = strtolower(trim($userMode));
+    $t = strtolower(trim($tripMode));
+    if (empty($u) || $t === 'mixed') return 100;
+    return $u === $t ? 100 : 70;
 }
 
 function calculateDestinationScore($userInterests, $destination, $region) {
